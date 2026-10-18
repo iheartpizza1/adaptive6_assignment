@@ -93,6 +93,7 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = MaxMind
     ``geoip_factory`` exists so tests can inject a fake instead of opening the real MMDB.
     """
     config, errors_file = parse_args(argv)
+    _use_utf8_output()
     with ExitStack() as stack:
         try:
             # Every input is checked before BadLineLog opens, because opening truncates the file.
@@ -123,6 +124,18 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = MaxMind
             file=sys.stderr,
         )
     return 0
+
+
+def _use_utf8_output() -> None:
+    """Print UTF-8 whatever the locale says, like the errors file.
+
+    Accented country names on stdout, or the arrow in the stderr summary, would otherwise raise
+    or turn into escapes on a legacy code page.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
 
 
 def _fail(error: Exception) -> int:

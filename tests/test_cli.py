@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import subprocess
 import sys
 from pathlib import Path
@@ -143,6 +144,23 @@ class TestCli:
         geoip.__enter__.assert_called_once()
         geoip.__exit__.assert_called_once()
         geoip.country_name.assert_called_once_with("1.1.1.1")
+
+    def test_output_is_utf8_even_when_the_streams_default_to_another_encoding(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        out_bytes, err_bytes = io.BytesIO(), io.BytesIO()
+        out = io.TextIOWrapper(out_bytes, encoding="cp1252", newline="\n")
+        err = io.TextIOWrapper(err_bytes, encoding="cp1252", newline="\n")
+        monkeypatch.setattr(sys, "stdout", out)
+        monkeypatch.setattr(sys, "stderr", err)
+        log = _write_log(tmp_path, ONE_LINE)
+        errors = tmp_path / "errors.log"
+        argv = [str(log), "--errors-file", str(errors)]
+        assert main(argv, geoip_factory=lambda path: FakeGeoIp({"1.1.1.1": "Сай"})) == 0
+        out.flush()
+        err.flush()
+        assert "Сай 100.00%" in out_bytes.getvalue().decode("utf-8")
+        assert f" → {errors}" in err_bytes.getvalue().decode("utf-8")
 
     # --- exit codes -------------------------------------------------------------------------
 
