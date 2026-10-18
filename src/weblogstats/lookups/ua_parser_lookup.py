@@ -12,6 +12,9 @@ from weblogstats.lookups.label_normalizer import LabelNormalizer
 # A missing user agent is valid input, not something to hand to the regex engine.
 _NO_USER_AGENT = frozenset({"", "-"})
 
+# 2 x 557 unique user-agent strings in apache_log.txt
+DEFAULT_CACHE_SIZE = 1114
+
 
 class UaParserLookup:
     """UserAgentLookup backed by ua-parser, with normalized labels and a per-UA cache."""
@@ -20,8 +23,10 @@ class UaParserLookup:
         self,
         os_normalizer: LabelNormalizer,
         browser_normalizer: LabelNormalizer,
-        cache_size: int = 4096,
+        cache_size: int = DEFAULT_CACHE_SIZE,
     ) -> None:
+        if cache_size < 1:
+            raise ValueError(f"cache_size must be at least 1, got {cache_size}")
         self._os_normalizer = os_normalizer
         self._browser_normalizer = browser_normalizer
         self._labels = lru_cache(maxsize=cache_size)(self._parse_labels)
