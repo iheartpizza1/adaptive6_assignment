@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weblogstats"
+version = "0.1.0"
+description = "Apache combined-log statistics: request share by Country, OS and Browser."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "geoip2>=5",
+    "ua-parser>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+weblogstats = "weblogstats.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "data: needs apache_log.txt or the GeoLite2 MMDB",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+# db/ holds the separate MySQL GeoIP tooling, not part of the weblogstats package.
+extend-exclude = ["db"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
