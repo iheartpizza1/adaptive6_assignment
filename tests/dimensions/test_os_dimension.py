@@ -74,14 +74,11 @@ def _user_agents(path: Path) -> list[str]:
     return agents
 
 
-class TestOsDimensionOnRealLog:
-    @pytest.mark.data
-    def test_no_other_label_and_enough_unknown(self, apache_log_path: Path) -> None:
-        dimension = OsDimension(
-            UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser())
-        )
-        agents = _user_agents(apache_log_path)
-        labels = [dimension.extract(_record(agent)) for agent in agents]
-        assert len(labels) == 10_000
-        assert "Other" not in labels
-        assert labels.count(UNKNOWN) >= 190
+@pytest.mark.data
+def test_real_log_has_no_other_label_and_enough_unknown(apache_log_path: Path) -> None:
+    dimension = OsDimension(UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser()))
+    agents = _user_agents(apache_log_path)
+    labels = [dimension.extract(_record(agent)) for agent in agents]
+    assert len(labels) == 10_000
+    assert "Other" not in labels
+    assert labels.count(UNKNOWN) >= 190

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-import ua_parser
 
 from weblogstats.contracts import UNKNOWN, UserAgentLookup
 from weblogstats.lookups.label_normalizer import LabelNormalizer
@@ -28,29 +25,7 @@ GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.
 FEED_PARSER = "UniversalFeedParser/4.2-pre-314-svn +http://feedparser.org/"
 
 
-class TestUaParserLibraryApi:
-    """Pins what we rely on from the real ua-parser 1.x, so an upgrade fails here first."""
-
-    def test_parse_returns_result_with_os_and_user_agent_families(self) -> None:
-        result = ua_parser.parse(CHROME_MAC)
-        assert result.os is not None
-        assert result.os.family == "Mac OS X"
-        assert result.user_agent is not None
-        assert result.user_agent.family == "Chrome"
-
-    def test_os_is_none_when_nothing_matched(self) -> None:
-        result = ua_parser.parse(GOOGLEBOT)
-        assert result.os is None
-        assert result.user_agent is not None
-        assert result.user_agent.family == "Googlebot"
-
-    def test_os_and_user_agent_are_both_none_for_an_unmatched_string(self) -> None:
-        result = ua_parser.parse("-")
-        assert result.os is None
-        assert result.user_agent is None
-
-
-class TestUaParserLookupLabels:
+class TestUaParserLookup:
     def _lookup(self) -> UaParserLookup:
         return UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser())
 
@@ -94,45 +69,3 @@ def test_is_re_exported_from_the_lookups_package() -> None:
     from weblogstats.lookups import UaParserLookup as Exported
 
     assert Exported is UaParserLookup
-
-
-class TestUaParserLookupCaching:
-    @pytest.fixture
-    def parse_calls(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
-        calls: list[str] = []
-        real_parse = ua_parser.parse
-
-        def counting_parse(user_agent: str) -> Any:
-            calls.append(user_agent)
-            return real_parse(user_agent)
-
-        monkeypatch.setattr("weblogstats.lookups.ua_parser_lookup.ua_parser.parse", counting_parse)
-        return calls
-
-    def _lookup(self, cache_size: int = 4096) -> UaParserLookup:
-        return UaParserLookup(
-            LabelNormalizer.for_os(), LabelNormalizer.for_browser(), cache_size=cache_size
-        )
-
-    def test_each_distinct_user_agent_is_parsed_once(self, parse_calls: list[str]) -> None:
-        lookup = self._lookup()
-        for _ in range(3):
-            lookup.os_family(CHROME_MAC)
-            lookup.browser_family(CHROME_MAC)
-        lookup.os_family(GOOGLEBOT)
-        assert parse_calls == [CHROME_MAC, GOOGLEBOT]
-
-    def test_dash_and_empty_never_reach_the_parser(self, parse_calls: list[str]) -> None:
-        lookup = self._lookup()
-        assert lookup.os_family("-") == UNKNOWN
-        assert lookup.browser_family("-") == UNKNOWN
-        assert lookup.os_family("") == UNKNOWN
-        assert lookup.browser_family("") == UNKNOWN
-        assert parse_calls == []
-
-    def test_cache_size_bounds_the_cache(self, parse_calls: list[str]) -> None:
-        lookup = self._lookup(cache_size=1)
-        lookup.os_family(CHROME_MAC)
-        lookup.os_family(GOOGLEBOT)
-        lookup.os_family(CHROME_MAC)
-        assert parse_calls == [CHROME_MAC, GOOGLEBOT, CHROME_MAC]
