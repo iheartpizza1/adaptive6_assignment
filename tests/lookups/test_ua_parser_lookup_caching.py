@@ -54,7 +54,7 @@ class TestUaParserLookupCaching:
         assert parse_calls == []
 
     def test_default_cache_size_is_twice_the_distinct_user_agents_in_the_log(self) -> None:
-        assert DEFAULT_CACHE_SIZE == 2 * 557
+        assert DEFAULT_CACHE_SIZE == 2 * 558
         default = inspect.signature(UaParserLookup).parameters["cache_size"].default
         assert default == DEFAULT_CACHE_SIZE
 
