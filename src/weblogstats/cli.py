@@ -16,6 +16,9 @@ from weblogstats.dimensions import BrowserDimension, CountryDimension, OsDimensi
 from weblogstats.formatting import TextReportFormatter
 from weblogstats.lookups import LabelNormalizer, MaxMindGeoIp, UaParserLookup
 from weblogstats.lookups.maxmind_geo_ip import DEFAULT_CACHE_SIZE as GEOIP_DEFAULT_CACHE_SIZE
+from weblogstats.lookups.ua_parser_lookup import (
+    DEFAULT_CACHE_SIZE as USER_AGENT_DEFAULT_CACHE_SIZE,
+)
 from weblogstats.parsing import ApacheCombinedParser, BadLineLog, LoggingParser
 from weblogstats.pipeline import Pipeline
 from weblogstats.sources import FileLogSource
@@ -29,8 +32,6 @@ ERRORS_FILE_ENV_VAR = "WEBLOGSTATS_ERRORS_FILE"
 # The names of the [lookups.<name>] tables in the config file.
 GEOIP_LOOKUP = "geoip"
 USER_AGENT_LOOKUP = "user_agent"
-# UaParserLookup's own cache_size default, used when the config file does not set one.
-USER_AGENT_DEFAULT_CACHE_SIZE = 4096
 
 # One entry per --format choice; a new ReportFormatter is registered here.
 _FORMATTERS: dict[str, Callable[[], ReportFormatter]] = {"text": TextReportFormatter}
