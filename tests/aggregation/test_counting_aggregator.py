@@ -62,3 +62,15 @@ class TestCountingAggregator:
             snapshot = aggregator.snapshot()
 
         assert snapshot == [DimensionReport(name="OS", rows=(("Windows", 100.0),))]
+
+    def test_dimensions_are_reported_in_first_observed_order(self) -> None:
+        aggregator = CountingAggregator()
+        aggregator.observe("OS", "Windows")
+        aggregator.observe("Country", "France")
+        aggregator.observe("Browser", "Chrome")
+        aggregator.observe("OS", "Linux")
+
+        assert [report.name for report in aggregator.snapshot()] == ["OS", "Country", "Browser"]
+
+    def test_empty_aggregator_gives_no_reports(self) -> None:
+        assert CountingAggregator().snapshot() == []
