@@ -178,6 +178,7 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = _open_m
         except OSError as error:
             return _fail(error)
         sys.stdout.write(formatter.format(aggregator.snapshot(config.other_below)))
+        print()
         print(stats.summary(), file=sys.stderr)
         print(
             f"bad lines: {bad_lines.warn_count} warn, {bad_lines.error_count} error"
