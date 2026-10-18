@@ -1,0 +1,29 @@
+Country:
+United States 21.05%
+Russia 10.53%
+Ukraine 10.53%
+Unknown 10.53%
+Venezuela 10.53%
+Argentina 5.26%
+China 5.26%
+France 5.26%
+Germany 5.26%
+India 5.26%
+Indonesia 5.26%
+South Korea 5.26%
+
+OS:
+Unknown 42.11%
+Windows 31.58%
+Linux 10.53%
+Mac OS 10.53%
+iOS 5.26%
+
+Browser:
+Chrome 26.32%
+Firefox 21.05%
+Unknown 21.05%
+Googlebot 15.79%
+IE 5.26%
+Mobile Safari 5.26%
+Sogou web spider 5.26%
