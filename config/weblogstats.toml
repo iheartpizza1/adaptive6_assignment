@@ -1,0 +1,6 @@
+# Per-lookup settings. Add a [lookups.<name>] table for a new lookup.
+[lookups.geoip]
+cache_size = 3506   # 2 x 1,753 unique client IPs in apache_log.txt
+
+[lookups.user_agent]
+cache_size = 1116   # 2 x 558 distinct User-Agent strings reaching the cache in apache_log.txt
