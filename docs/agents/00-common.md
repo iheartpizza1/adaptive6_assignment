@@ -2,7 +2,7 @@
 
 Read this file before your own brief. Your brief (`01-…` to `06-…`) says *what* to build; this file says *how*.
 
-The design source of truth is [`docs/hld.html`](../hld.html) (v1.3.0). Read §3 (input profile), §4 (assumptions), §8 (abstractions and module layout), §11 (errors / Unknown / Other) and §13 (testing) before writing code. If your brief and the HLD disagree, follow your brief and say so in the PR description.
+The design source of truth is [`docs/hld.html`](../hld.html) (v1.4.0). Read §3 (input profile), §4 (assumptions), §8 (abstractions and module layout), §11 (errors / Unknown / Other) and §13 (testing) before writing code. If your brief and the HLD disagree, follow your brief and say so in the PR description.
 
 ## Repository and data
 

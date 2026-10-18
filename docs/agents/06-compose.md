@@ -41,6 +41,17 @@ You wire the existing pieces together and document them. **Do not change the int
    It then runs the pipeline and prints the report to stdout and `stats.summary()` to stderr.
 5. Exit codes: 0 on success; 1 with a clear stderr message for a missing log, a missing MMDB or a wrong DB edition. No partial report is printed on these errors.
 6. `--other-below X` is passed to `snapshot`.
+6a. **Bad-line log:**
+   - Add `--errors-file PATH` (default `weblogstats-errors.log` in the current directory).
+   - Wrap the parser as `LoggingParser(ApacheCombinedParser(), BadLineLog(path))`, opening `BadLineLog` as a context manager so it is closed on every exit path.
+   - Open it only after the input checks (log exists, MMDB valid), so a failed start never truncates an earlier run's errors file.
+   - After the stats summary, write a second stderr line: `bad lines: 1 warn, 0 error → weblogstats-errors.log`.
+   - `AppConfig` has no field for the path, so pass it alongside the config without changing the contract, and note this in the PR as a candidate contract addition.
+   - Add `weblogstats-errors.log` to `.gitignore` (one line; you may touch only this line of that file).
+   - Tests:
+     - The golden run writes exactly the two expected entries for the fixture (1 WARN, 1 ERROR).
+     - A failed start (missing log) leaves a pre-existing errors file untouched.
+     - The data test asserts the errors file has exactly one `WARN partial` line.
 7. **Golden test:** run `main` on `tests/fixtures/sample.log` with `FakeGeoIp` injected. Give `main` an optional, test-only keyword argument (e.g. `geoip_factory`), or factor the wiring into a `build_pipeline(config, geoip)` function in `cli.py`. Compare stdout to `sample.expected.txt` exactly. Real ua-parser is fine here.
 8. **Data test (`@pytest.mark.data`):** run the real CLI on the full log with the real MMDB. Assert:
    - stderr `total=10000 strict=9999 partial=1 unreadable=0`
@@ -53,7 +64,7 @@ You wire the existing pieces together and document them. **Do not change the int
 
 ### README
 
-10. **Usage:** the command line (`weblogstats apache_log.txt --geoip data/GeoLite2-Country.mmdb`, plus `python -m weblogstats`), every flag, the env var `GEOIP_DB`, real sample output (the top lines of each block from the 10k run), the stderr summary, the exit codes, and how the denominator, Unknown and Other behave (one short paragraph each, linking the HLD).
+10. **Usage:** the command line (`weblogstats apache_log.txt --geoip data/GeoLite2-Country.mmdb`, plus `python -m weblogstats`), every flag, the env var `GEOIP_DB`, real sample output (the top lines of each block from the 10k run), the stderr summary, the exit codes, the **errors file** (location, the `--errors-file` flag, the entry format with a WARN and an ERROR example, and that it is truncated on every run), and how the denominator, Unknown and Other behave (one short paragraph each, linking the HLD).
 11. **Extending**, as step-by-step recipes. Each names the file to create (one class per file), the test to write first, and the one line to register:
     - **New dimension:** a worked `StatusDimension` (status → `2xx`/`3xx`/`4xx`/`5xx`/`Unknown`). Show the full class and test code in the README. Add a temporary test in your worktree that follows the recipe literally, run it, then delete the test and the class before committing. The README is documentation and the shipped CLI keeps three dimensions. Mention in the PR that you verified the recipe.
     - **New output format:** e.g. `formatting/json_report_formatter.py`, plus the `--format` choice.
