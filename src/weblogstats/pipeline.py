@@ -34,13 +34,14 @@ class Pipeline:
         """Process every line and return the parse counters.
 
         Every dimension observes exactly one label per line, so all dimensions share one
-        denominator. A dimension that raises for a record contributes ``Unknown`` for it.
+        denominator. A dimension that raises for a record contributes ``Unknown`` for it and
+        adds one to ``stats.extract_errors``.
         """
         stats = RunStats()
         for line in self._source.lines():
             record = self._parse(line, stats)
             for dimension in self._dimensions:
-                self._aggregator.observe(dimension.name, self._label(dimension, record))
+                self._aggregator.observe(dimension.name, self._label(dimension, record, stats))
         return stats
 
     def _parse(self, line: str, stats: RunStats) -> LogRecord:
@@ -56,9 +57,10 @@ class Pipeline:
         return record
 
     @staticmethod
-    def _label(dimension: Dimension, record: LogRecord) -> str:
-        # A plugin bug must cost one label, never the run.
+    def _label(dimension: Dimension, record: LogRecord, stats: RunStats) -> str:
+        # A plugin bug must cost one label, never the run; it is counted so it is not silent.
         try:
             return dimension.extract(record)
         except Exception:
+            stats.extract_errors += 1
             return UNKNOWN

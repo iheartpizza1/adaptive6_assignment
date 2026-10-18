@@ -139,6 +139,29 @@ class TestPipeline:
         assert _rows(reports, "Broken") == {UNKNOWN: 100.0}
         assert _rows(reports, "Country") == {"France": 50.0, "United States": 50.0}
 
+    def test_each_dimension_failure_is_counted_in_extract_errors(self) -> None:
+        def explode(record: LogRecord) -> str:
+            if record.ip == "2.2.2.2":
+                raise RuntimeError("boom")
+            return "ok"
+
+        def always_fails(record: LogRecord) -> str:
+            raise ValueError("nope")
+
+        flaky = SimpleNamespace(name="Flaky", extract=explode)
+        broken = SimpleNamespace(name="Broken", extract=always_fails)
+        pipeline, _ = _run([STRICT_FR, STRICT_US, STRICT_FR], [flaky, broken, *_dimensions()])
+        stats = pipeline.run()
+        # Flaky fails once, Broken three times; the real dimensions never.
+        assert stats.extract_errors == 4
+        assert stats.summary().endswith(" extract_errors=4")
+
+    def test_a_clean_run_has_no_extract_errors(self) -> None:
+        pipeline, _ = _run([STRICT_FR, STRICT_US, PARTIAL, GARBAGE])
+        stats = pipeline.run()
+        assert stats.extract_errors == 0
+        assert "extract_errors" not in stats.summary()
+
     def test_the_source_is_read_once(self) -> None:
         calls: list[int] = []
 
