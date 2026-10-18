@@ -153,6 +153,35 @@ class TestMaxMindGeoIp:
             raise RuntimeError("boom")
         reader.close.assert_called_once()
 
+    @pytest.mark.data
+    def test_real_db_resolves_the_first_fixture_ip_to_a_country(self, geoip_db_path: Path) -> None:
+        with MaxMindGeoIp(geoip_db_path) as geoip:
+            country = geoip.country_name("83.149.9.216")
+        assert country
+        assert country != UNKNOWN
+
+    @pytest.mark.data
+    def test_real_db_resolves_google_dns_to_united_states(self, geoip_db_path: Path) -> None:
+        with MaxMindGeoIp(geoip_db_path) as geoip:
+            assert geoip.country_name("8.8.8.8") == "United States"
+
+    @pytest.mark.data
+    def test_real_db_gives_unknown_for_private_and_empty_ips(self, geoip_db_path: Path) -> None:
+        with MaxMindGeoIp(geoip_db_path) as geoip:
+            assert geoip.country_name("10.0.0.1") == UNKNOWN
+            assert geoip.country_name("") == UNKNOWN
+
+    @pytest.mark.data
+    def test_real_log_has_under_two_percent_unknown_countries(
+        self, geoip_db_path: Path, apache_log_path: Path
+    ) -> None:
+        with apache_log_path.open(encoding="utf-8", errors="replace") as handle:
+            ips = {line.split(" ", 1)[0] for line in handle if line.strip()}
+        with MaxMindGeoIp(geoip_db_path) as geoip:
+            unknown = sum(1 for ip in ips if geoip.country_name(ip) == UNKNOWN)
+        assert len(ips) > 1000
+        assert unknown / len(ips) < 0.02
+
     def test_different_ips_are_looked_up_separately(self, db_file: Path) -> None:
         reader = _stub_reader()
         reader.country.side_effect = [
