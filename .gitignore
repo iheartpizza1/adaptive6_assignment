@@ -54,6 +54,7 @@ data/
 GeoLite2-*
 apache_log.txt
 Assignment_instructions.md
+weblogstats-errors.log
 
 # Python
 .venv/
