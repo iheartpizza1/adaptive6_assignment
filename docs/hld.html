@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Statistical Reporting Module — HLD v1.4.0</title>
+  <title>Statistical Reporting Module — HLD v1.6.0</title>
   <style>
     :root {
       --ink: #1c1914;
@@ -218,7 +218,7 @@
       <h1>Statistical Reporting Module</h1>
       <p class="sub">High-level design for an Apache log analyzer that reports request share by Country, OS, and Browser — written so implementation can fan out across git worktrees.</p>
       <div class="meta">
-        <span class="chip" id="doc-version">Version 1.4.0</span>
+        <span class="chip" id="doc-version">Version 1.6.0</span>
         <span class="chip">18 Oct 2026</span>
         <span class="chip">Language: Python ≥ 3.12</span>
         <span class="chip">Runtime target: ~10k log lines, streamable</span>
@@ -275,6 +275,16 @@
               <td>1.4.0</td>
               <td>2026-10-18</td>
               <td>Bad lines are now also written to an errors file (§11): <code>WARN partial</code> / <code>ERROR unreadable</code>, with a UTC timestamp and the full line. It is built by the parser agent as <code>LoggingParser</code> + <code>BadLineLog</code> (no contract change) and wired by compose via <code>--errors-file</code>. The parser and compose briefs are updated.</td>
+            </tr>
+            <tr>
+              <td>1.5.0</td>
+              <td>2026-10-18</td>
+              <td>Lookup cache sizes now come from a TOML config file (<code>config/weblogstats.toml</code>, read with the stdlib <code>tomllib</code>), keyed per lookup as <code>[lookups.&lt;name&gt;]</code>: §5 gains a Config row, §8 lists <code>config/lookup_settings.py</code> (<code>LookupSettings</code>), and §9 gains a "New lookup setting" paragraph. The CLI takes <code>--config</code> / <code>WEBLOGSTATS_CONFIG</code>.</td>
+            </tr>
+            <tr>
+              <td>1.6.0</td>
+              <td>2026-10-18</td>
+              <td>Two contract changes, approved for the compose PR. <code>AppConfig</code> gains <code>errors_file</code> (precedence: <code>--errors-file</code> &gt; <code>WEBLOGSTATS_ERRORS_FILE</code> &gt; <code>[output] errors_file</code> in the config file &gt; <code>weblogstats-errors.log</code>) and <code>config_path</code>, so <code>parse_args</code> returns just an <code>AppConfig</code>. <code>RunStats</code> gains <code>extract_errors</code>, which counts the times a dimension raised; <code>summary()</code> appends <code>extract_errors=N</code> only when it is above 0. §8 and §11 are updated.</td>
             </tr>
           </tbody>
         </table>
@@ -479,6 +489,11 @@
               <td>No extra framework. Flags: log path, geoip path, optional other-threshold, output format.</td>
             </tr>
             <tr>
+              <td>Config</td>
+              <td>TOML via stdlib <code>tomllib</code>, <code>config/weblogstats.toml</code></td>
+              <td>Per-lookup settings (cache sizes), no extra dependency.</td>
+            </tr>
+            <tr>
               <td>Tests</td>
               <td>pytest + ruff</td>
               <td>Parser, each dimension, aggregator rounding/sort, golden CLI on a 20-line fixture. Developed test-first (§13).</td>
@@ -657,6 +672,7 @@
 <pre>
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Iterator, Protocol
 
 @dataclass(frozen=True)
@@ -708,6 +724,16 @@ class RunStats:             # feeds the stderr summary
     strict: int = 0
     partial: int = 0
     unreadable: int = 0
+    extract_errors: int = 0  # dimension failures; summary() shows it only when &gt; 0
+
+@dataclass(frozen=True)
+class AppConfig:            # resolved by cli.parse_args
+    log_path: Path
+    geoip_path: Path
+    output_format: str = "text"
+    other_below: float | None = None
+    errors_file: Path = Path("weblogstats-errors.log")  # flag &gt; env &gt; config file &gt; default
+    config_path: Path | None = None                     # TOML settings file in use, if any
 </pre>
         <p><strong>Module layout</strong> (one class per file; the owner is the agent from §12):</p>
 <pre>
@@ -715,6 +741,8 @@ src/weblogstats/
   __init__.py  __main__.py
   cli.py                              # main(argv) composition root, no class        [Wave 2]
   pipeline.py                         # Pipeline                                     [Wave 2]
+  config/lookup_settings.py           # LookupSettings                               [compose]
+  config/output_settings.py           # OutputSettings ([output] errors_file)        [compose]
   contracts/                          #                                              [Wave 0]
     log_record.py  log_source.py  log_parser.py  dimension.py
     geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
@@ -731,6 +759,7 @@ src/weblogstats/
   dimensions/browser_dimension.py     # BrowserDimension                             [ua]
   aggregation/counting_aggregator.py  # CountingAggregator                           [report]
   formatting/text_report_formatter.py # TextReportFormatter                          [report]
+config/weblogstats.toml               # default settings (cache sizes, errors file)  [compose]
 tests/
   fakes/fake_geo_ip.py  fakes/fake_user_agent_lookup.py                              [Wave 0]
   fixtures/sample.log                                                                [Wave 0]
@@ -751,6 +780,7 @@ tests/
         <p><strong>New output format</strong> — implement <code>ReportFormatter</code>, one file per formatter (<code>formatting/json_report_formatter.py</code>, <code>formatting/csv_report_formatter.py</code>). Choose with <code>--format text|json</code>.</p>
         <p><strong>New log dialect</strong> — implement <code>LogParser</code>. Keep <code>LogRecord</code> stable; unknown fields can be ignored.</p>
         <p><strong>New geo source</strong> — implement <code>GeoIpLookup</code> (offline CSV, test fake). Production stays on MaxMind file.</p>
+        <p><strong>New lookup setting</strong> — add a <code>[lookups.&lt;name&gt;]</code> table to <code>config/weblogstats.toml</code> (today only <code>cache_size</code>), and read it where the lookup is built in <code>cli.py</code> with <code>settings.cache_size("&lt;name&gt;", default)</code>. <code>LookupSettings</code> stores a generic name → settings mapping, so it needs no change; an unknown key inside a table, or a bad value, fails at start-up with the file and key named.</p>
         <p><strong>Filters later</strong> — optional <code>RecordFilter</code> protocol in front of dimensions (e.g. only GET, only 200, or <code>BotFilter</code> behind <code>--exclude-bots</code>, using ua-parser's device family <code>Spider</code> plus a small regex for feed readers). Not built in v1. Filtered records leave the denominator, and the stderr summary says how many.</p>
       </div>
       <div class="feedback">
@@ -788,7 +818,8 @@ Chrome 35.45%
         <ul>
           <li><strong>Missing log file / missing MMDB:</strong> non-zero exit, clear message. Do not start a partial report.</li>
           <li><strong>Malformed line:</strong> never dropped and never fatal. Strict regex → lenient fallback (<code>partial=True</code>) → if even the IP cannot be read, the pipeline uses an empty <code>LogRecord</code>, so every dimension yields <code>Unknown</code>. The line stays in the denominator. stderr on this log: <code>total=10000 strict=9999 partial=1 unreadable=0</code>.</li>
-          <li><strong>Bad-line log (errors file):</strong> each partial or unreadable line is also written to <code>--errors-file</code> (default <code>weblogstats-errors.log</code>) as <code>&lt;UTC timestamp&gt; &lt;LEVEL&gt; &lt;kind&gt; &lt;full line&gt;</code>: <code>WARN partial …</code> for lenient-fallback records, <code>ERROR unreadable …</code> for lines the parser rejected. The full line is never truncated. The file is truncated at the start of each run (only after the input checks pass), so an empty file means a clean run. It is implemented by <code>LoggingParser</code>, a decorator over any <code>LogParser</code>, plus <code>BadLineLog</code>, so no contract changes and the pipeline is unaware of it. On this log the file holds one <code>WARN partial</code> entry (line 8899). stderr adds <code>bad lines: 1 warn, 0 error → weblogstats-errors.log</code>.</li>
+          <li><strong>Bad-line log (errors file):</strong> each partial or unreadable line is also written to <code>AppConfig.errors_file</code>, which is <code>--errors-file</code>, else <code>WEBLOGSTATS_ERRORS_FILE</code>, else <code>[output] errors_file</code> in the config file, else <code>weblogstats-errors.log</code>, as <code>&lt;UTC timestamp&gt; &lt;LEVEL&gt; &lt;kind&gt; &lt;full line&gt;</code>: <code>WARN partial …</code> for lenient-fallback records, <code>ERROR unreadable …</code> for lines the parser rejected. The full line is never truncated. The file is truncated at the start of each run (only after the input checks pass), so an empty file means a clean run. It is implemented by <code>LoggingParser</code>, a decorator over any <code>LogParser</code>, plus <code>BadLineLog</code>, so no contract changes and the pipeline is unaware of it. On this log the file holds one <code>WARN partial</code> entry (line 8899). stderr adds <code>bad lines: 1 warn, 0 error → weblogstats-errors.log</code>.</li>
+          <li><strong>Dimension failure:</strong> if a dimension's <code>extract</code> raises for a record, that record gets <code>Unknown</code> in that dimension and the run continues. Each failure is counted in <code>RunStats.extract_errors</code>, and the stderr summary appends <code>extract_errors=N</code> when it is above 0 (the line is unchanged otherwise), so a plugin bug is never silent.</li>
           <li><strong>UA <code>"-"</code>, bytes <code>-</code>, <code>\x</code> escapes:</strong> valid input, not errors (§3).</li>
           <li><strong>Wrong GeoIP DB type</strong> (e.g. ASN): fail at startup with a message naming the expected Country/City edition.</li>
           <li><strong>Unknown:</strong> extractor return value when IP or UA cannot be classified. Always a first-class bucket.</li>
@@ -940,7 +971,7 @@ Chrome 35.45%
   </footer>
 
   <script>
-    const VERSION = "1.4.0";
+    const VERSION = "1.6.0";
     const STORAGE_KEY = "adaptive6-hld-comments-" + VERSION;
     const boxes = [...document.querySelectorAll("textarea[data-key]")];
 

@@ -1,0 +1,11 @@
+# Per-lookup settings. Add a [lookups.<name>] table for a new lookup.
+[lookups.geoip]
+cache_size = 3506   # 2 x 1,753 unique client IPs in apache_log.txt
+
+[lookups.user_agent]
+cache_size = 1116   # 2 x 558 distinct User-Agent strings reaching the cache in apache_log.txt
+
+# Run outputs. Relative paths are relative to the current directory.
+# --errors-file and WEBLOGSTATS_ERRORS_FILE both override this.
+[output]
+errors_file = "weblogstats-errors.log"

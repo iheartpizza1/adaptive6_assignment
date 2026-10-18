@@ -20,3 +20,12 @@ class TestRunStats:
         stats.total += 1
         stats.strict += 1
         assert stats.summary() == "total=1 strict=1 partial=0 unreadable=0"
+
+    def test_extract_errors_defaults_to_zero_and_is_left_out_of_the_summary(self) -> None:
+        stats = RunStats(total=3, strict=3)
+        assert stats.extract_errors == 0
+        assert stats.summary() == "total=3 strict=3 partial=0 unreadable=0"
+
+    def test_summary_appends_extract_errors_when_there_are_any(self) -> None:
+        stats = RunStats(total=3, strict=3, extract_errors=2)
+        assert stats.summary() == "total=3 strict=3 partial=0 unreadable=0 extract_errors=2"
