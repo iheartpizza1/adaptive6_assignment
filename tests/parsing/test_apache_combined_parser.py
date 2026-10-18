@@ -144,3 +144,73 @@ class TestApacheCombinedParser:
             assert record.timestamp is None, bad
             assert record.ip == "1.2.3.4", bad
             assert record.partial is False, bad
+
+    def test_truncated_line_falls_back_to_a_partial_record(
+        self, parser: ApacheCombinedParser, sample_lines: list[str]
+    ) -> None:
+        line = sample_lines[TRUNCATED_LINE - 1]
+        record = parser.parse(line)
+        assert record is not None
+        assert record.partial is True
+        assert record.ip == "46.118.127.106"
+        assert record.user_agent == (
+            "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html"
+        )
+        assert record.raw == line
+
+    def test_partial_record_recovers_the_other_fields_it_can(
+        self, parser: ApacheCombinedParser, sample_lines: list[str]
+    ) -> None:
+        record = parser.parse(sample_lines[TRUNCATED_LINE - 1])
+        assert record is not None
+        assert record.timestamp == datetime(2015, 5, 20, 12, 5, 17, tzinfo=UTC)
+        assert (record.method, record.path, record.protocol) == (
+            "GET",
+            "/scripts/grok-py-test/configlib.py",
+            "HTTP/1.1",
+        )
+        assert record.status == 200
+        assert record.bytes_sent == 235
+        assert record.referer == "-"
+
+    def test_fallback_with_nothing_but_an_ip_leaves_the_rest_empty(
+        self, parser: ApacheCombinedParser
+    ) -> None:
+        record = parser.parse("9.9.9.9 - - [broken")
+        assert record == LogRecord(
+            ip="9.9.9.9",
+            timestamp=None,
+            method="",
+            path="",
+            protocol="",
+            status=None,
+            bytes_sent=None,
+            referer="",
+            user_agent="",
+            raw="9.9.9.9 - - [broken",
+            partial=True,
+        )
+
+    def test_fallback_accepts_an_ipv6_address(self, parser: ApacheCombinedParser) -> None:
+        record = parser.parse('2001:db8::1 - - [broken "GET / HTTP/1.1" 200 5 "-" "Agent/1.0')
+        assert record is not None
+        assert record.partial is True
+        assert record.ip == "2001:db8::1"
+        assert record.user_agent == "Agent/1.0"
+
+    def test_fallback_user_agent_drops_a_trailing_quote(self, parser: ApacheCombinedParser) -> None:
+        record = parser.parse('9.9.9.9 junk "-" "Agent/1.0"')
+        assert record is not None
+        assert record.partial is True
+        assert record.user_agent == "Agent/1.0"
+
+    def test_garbage_line_is_unreadable(
+        self, parser: ApacheCombinedParser, sample_lines: list[str]
+    ) -> None:
+        assert parser.parse(sample_lines[GARBAGE_LINE - 1]) is None
+
+    @pytest.mark.parametrize("line", ["", "   ", "-", '"GET / HTTP/1.1" 200', "999.1.1.1 x"])
+    def test_lines_without_a_leading_ip_are_unreadable(
+        self, parser: ApacheCombinedParser, line: str
+    ) -> None:
+        assert parser.parse(line) is None
