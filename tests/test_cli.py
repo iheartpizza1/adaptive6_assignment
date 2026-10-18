@@ -23,7 +23,7 @@ PARTIAL = '2.2.2.2 - - [17/May/2015:10:05:03 +0000] "GET / HTTP/1.1" 200 10 "-" 
 GARBAGE = "this is not a log line"
 
 
-def _geoip(path: Path) -> GeoIpLookup:
+def _geoip(path: Path, cache_size: int) -> GeoIpLookup:
     return FakeGeoIp({"1.1.1.1": "France", "2.2.2.2": "Spain"})
 
 
@@ -37,7 +37,7 @@ class TestCli:
     # --- argument parsing -------------------------------------------------------------------
 
     def test_parse_args_builds_an_app_config_and_the_errors_file(self) -> None:
-        config, errors_file = parse_args(
+        config, errors_file, _ = parse_args(
             [
                 "access.log",
                 "--geoip",
@@ -60,7 +60,7 @@ class TestCli:
 
     def test_parse_args_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("GEOIP_DB", raising=False)
-        config, errors_file = parse_args(["access.log"])
+        config, errors_file, _ = parse_args(["access.log"])
         assert config.output_format == "text"
         assert config.other_below is None
         assert config.geoip_path == DEFAULT_GEOIP_PATH == Path("data/GeoLite2-Country.mmdb")
@@ -125,9 +125,9 @@ class TestCli:
     def test_the_geoip_factory_receives_the_geoip_path(self, tmp_path: Path) -> None:
         seen: list[Path] = []
 
-        def factory(path: Path) -> GeoIpLookup:
+        def factory(path: Path, cache_size: int) -> GeoIpLookup:
             seen.append(path)
-            return _geoip(path)
+            return _geoip(path, cache_size)
 
         log = _write_log(tmp_path, ONE_LINE)
         errors = tmp_path / "errors.log"
@@ -140,7 +140,7 @@ class TestCli:
         geoip.country_name.return_value = "France"
         log = _write_log(tmp_path, ONE_LINE)
         errors = tmp_path / "errors.log"
-        main([str(log), "--errors-file", str(errors)], geoip_factory=lambda path: geoip)
+        main([str(log), "--errors-file", str(errors)], geoip_factory=lambda path, cache_size: geoip)
         geoip.__enter__.assert_called_once()
         geoip.__exit__.assert_called_once()
         geoip.country_name.assert_called_once_with("1.1.1.1")
@@ -156,7 +156,7 @@ class TestCli:
         log = _write_log(tmp_path, ONE_LINE)
         errors = tmp_path / "errors.log"
         argv = [str(log), "--errors-file", str(errors)]
-        assert main(argv, geoip_factory=lambda path: FakeGeoIp({"1.1.1.1": "Сай"})) == 0
+        assert main(argv, geoip_factory=lambda path, cache_size: FakeGeoIp({"1.1.1.1": "Сай"})) == 0
         out.flush()
         err.flush()
         assert "Сай 100.00%" in out_bytes.getvalue().decode("utf-8")
@@ -193,7 +193,7 @@ class TestCli:
     def test_wrong_database_edition_exits_1_with_the_message(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        def asn_factory(path: Path) -> GeoIpLookup:
+        def asn_factory(path: Path, cache_size: int) -> GeoIpLookup:
             raise ValueError("x.mmdb is a 'GeoLite2-ASN' database. The Country edition is required")
 
         log = _write_log(tmp_path, ONE_LINE)

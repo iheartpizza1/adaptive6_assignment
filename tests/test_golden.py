@@ -36,7 +36,7 @@ SAMPLE_COUNTRIES = {
 PERCENT_ROW = re.compile(r"^.+ (\d+\.\d{2})%$")
 
 
-def _fake_geoip(path: Path) -> GeoIpLookup:
+def _fake_geoip(path: Path, cache_size: int) -> GeoIpLookup:
     return FakeGeoIp(SAMPLE_COUNTRIES)
 
 

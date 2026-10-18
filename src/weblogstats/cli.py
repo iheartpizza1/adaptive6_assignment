@@ -10,22 +10,37 @@ from contextlib import AbstractContextManager, ExitStack
 from pathlib import Path
 
 from weblogstats.aggregation import CountingAggregator
+from weblogstats.config import LookupSettings
 from weblogstats.contracts import AppConfig, Dimension, GeoIpLookup, ReportFormatter
 from weblogstats.dimensions import BrowserDimension, CountryDimension, OsDimension
 from weblogstats.formatting import TextReportFormatter
 from weblogstats.lookups import LabelNormalizer, MaxMindGeoIp, UaParserLookup
+from weblogstats.lookups.maxmind_geo_ip import DEFAULT_CACHE_SIZE as GEOIP_DEFAULT_CACHE_SIZE
 from weblogstats.parsing import ApacheCombinedParser, BadLineLog, LoggingParser
 from weblogstats.pipeline import Pipeline
 from weblogstats.sources import FileLogSource
 
 DEFAULT_GEOIP_PATH = Path("data/GeoLite2-Country.mmdb")
 DEFAULT_ERRORS_FILE = Path("weblogstats-errors.log")
+DEFAULT_CONFIG_PATH = Path("config/weblogstats.toml")
+CONFIG_ENV_VAR = "WEBLOGSTATS_CONFIG"
+
+# The names of the [lookups.<name>] tables in the config file.
+GEOIP_LOOKUP = "geoip"
+USER_AGENT_LOOKUP = "user_agent"
+# UaParserLookup's own cache_size default, used when the config file does not set one.
+USER_AGENT_DEFAULT_CACHE_SIZE = 4096
 
 # One entry per --format choice; a new ReportFormatter is registered here.
 _FORMATTERS: dict[str, Callable[[], ReportFormatter]] = {"text": TextReportFormatter}
 OUTPUT_FORMATS = tuple(_FORMATTERS)
 
-GeoIpFactory = Callable[[Path], GeoIpLookup]
+# (MMDB path, cache size) -> lookup. Tests inject a fake here.
+GeoIpFactory = Callable[[Path, int], GeoIpLookup]
+
+
+def _open_maxmind(path: Path, cache_size: int) -> GeoIpLookup:
+    return MaxMindGeoIp(path, cache_size=cache_size)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -62,14 +77,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="where partial and unreadable lines are logged; truncated on every run "
         "(default: %(default)s)",
     )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=f"TOML file with per-lookup settings (default: ${CONFIG_ENV_VAR}, else "
+        f"{DEFAULT_CONFIG_PATH} if it exists)",
+    )
     return parser
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[AppConfig, Path]:
-    """Parse the command line into an AppConfig and the errors-file path.
+def parse_args(argv: list[str] | None = None) -> tuple[AppConfig, Path, Path | None]:
+    """Parse the command line into an AppConfig, the errors-file path and the settings path.
 
-    The path travels beside the config because AppConfig has no field for it. Exits with
-    status 2 on a usage error.
+    The two paths travel beside the config because AppConfig has no field for them. The settings
+    path is the --config flag, else $WEBLOGSTATS_CONFIG, else the default file if it exists, else
+    None. Exits with status 2 on a usage error.
     """
     namespace = _build_parser().parse_args(argv)
     config = AppConfig(
@@ -78,27 +102,46 @@ def parse_args(argv: list[str] | None = None) -> tuple[AppConfig, Path]:
         output_format=namespace.output_format,
         other_below=namespace.other_below,
     )
-    return config, namespace.errors_file
+    return config, namespace.errors_file, _resolve_settings_path(namespace.config)
 
 
-def build_dimensions(geoip: GeoIpLookup) -> list[Dimension]:
+def _resolve_settings_path(flag: Path | None) -> Path | None:
+    if flag is not None:
+        return flag
+    if os.environ.get(CONFIG_ENV_VAR):
+        return Path(os.environ[CONFIG_ENV_VAR])
+    return DEFAULT_CONFIG_PATH if DEFAULT_CONFIG_PATH.is_file() else None
+
+
+def build_dimensions(geoip: GeoIpLookup, settings: LookupSettings) -> list[Dimension]:
     """The registration point: a new Dimension is one more entry in this list."""
-    ua = UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser())
+    ua = UaParserLookup(
+        LabelNormalizer.for_os(),
+        LabelNormalizer.for_browser(),
+        cache_size=settings.cache_size(USER_AGENT_LOOKUP, USER_AGENT_DEFAULT_CACHE_SIZE),
+    )
     return [CountryDimension(geoip), OsDimension(ua), BrowserDimension(ua)]
 
 
-def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = MaxMindGeoIp) -> int:
+def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = _open_maxmind) -> int:
     """Run the report. Returns 0, or 1 after printing a message to stderr for a bad input.
 
     ``geoip_factory`` exists so tests can inject a fake instead of opening the real MMDB.
     """
-    config, errors_file = parse_args(argv)
+    config, errors_file, settings_path = parse_args(argv)
     _use_utf8_output()
     with ExitStack() as stack:
         try:
             # Every input is checked before BadLineLog opens, because opening truncates the file.
+            settings = (
+                LookupSettings.defaults()
+                if settings_path is None
+                else LookupSettings.load(settings_path)
+            )
             source = FileLogSource(config.log_path)
-            geoip = geoip_factory(config.geoip_path)
+            geoip = geoip_factory(
+                config.geoip_path, settings.cache_size(GEOIP_LOOKUP, GEOIP_DEFAULT_CACHE_SIZE)
+            )
             if isinstance(geoip, AbstractContextManager):
                 stack.enter_context(geoip)
             bad_lines = stack.enter_context(BadLineLog(errors_file))
@@ -108,7 +151,7 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = MaxMind
         pipeline = Pipeline(
             source,
             LoggingParser(ApacheCombinedParser(), bad_lines),
-            build_dimensions(geoip),
+            build_dimensions(geoip, settings),
             aggregator,
         )
         formatter = _FORMATTERS[config.output_format]()
