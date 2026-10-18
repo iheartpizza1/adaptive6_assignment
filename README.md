@@ -48,15 +48,18 @@ apart. Both streams are written as UTF-8.
 | `--geoip PATH` | `$GEOIP_DB`, else `data/GeoLite2-Country.mmdb` | The MaxMind GeoLite2 **Country** (or City) MMDB. |
 | `--format {text}` | `text` | Output format. Only `text` exists today; see [Extending](#extending). |
 | `--other-below FLOAT` | off | Roll every row below this percentage into one `Other` row at the end of its block. |
-| `--errors-file PATH` | `weblogstats-errors.log` | Where partial and unreadable lines are logged. See [The errors file](#the-errors-file). |
-| `--config PATH` | `$WEBLOGSTATS_CONFIG`, else `config/weblogstats.toml` if it exists | TOML file with per-lookup settings. See [The config file](#the-config-file). |
+| `--errors-file PATH` | `$WEBLOGSTATS_ERRORS_FILE`, else `[output] errors_file` in the config file, else `weblogstats-errors.log` | Where partial and unreadable lines are logged. See [The errors file](#the-errors-file). |
+| `--config PATH` | `$WEBLOGSTATS_CONFIG`, else `config/weblogstats.toml` if it exists | TOML settings file: lookup cache sizes and the errors file. See [The config file](#the-config-file). |
 | `-h`, `--help` | | Show the usage and exit. |
 
-The `GEOIP_DB` environment variable sets the default for `--geoip`; the flag wins when both are given.
+Environment variables set defaults for flags, and the flag wins when both are given: `GEOIP_DB`
+for `--geoip`, `WEBLOGSTATS_CONFIG` for `--config` and `WEBLOGSTATS_ERRORS_FILE` for
+`--errors-file`. An empty variable counts as unset.
 
 ### The config file
 
-Lookup cache sizes are set per lookup in a TOML file. The repository ships
+Lookup cache sizes (per lookup) and the errors-file path are set in a TOML file, read with the
+standard library's `tomllib`. The repository ships
 [`config/weblogstats.toml`](config/weblogstats.toml):
 
 ```toml
@@ -66,16 +69,24 @@ cache_size = 3506   # 2 x 1,753 unique client IPs in apache_log.txt
 
 [lookups.user_agent]
 cache_size = 1116   # 2 x 558 distinct User-Agent strings reaching the cache in apache_log.txt
+
+# Run outputs. Relative paths are relative to the current directory.
+# --errors-file and WEBLOGSTATS_ERRORS_FILE both override this.
+[output]
+errors_file = "weblogstats-errors.log"
 ```
 
 `cache_size` is the number of entries the lookup's LRU cache holds, an integer of at least 1.
 A lookup with no table (or no `cache_size`) keeps the default built into its constructor.
+`[output] errors_file` is a non-empty path string; a relative path is relative to the current
+directory, not to the config file. Every table and key is optional.
 
 The file is found in this order: the `--config` flag, then the `WEBLOGSTATS_CONFIG` environment
 variable, then `config/weblogstats.toml` relative to the current directory if it exists, and
 otherwise no file at all (every lookup uses its own default). A file that is missing, is not valid
-TOML, has a bad value (zero, negative, a string, a boolean), has a misspelled key inside a lookup
-table, or has a `lookups.<name>` that is not a table stops the run with exit code 1 and a message
+TOML, has a bad value (zero, negative, a string, a boolean, an empty `errors_file`), has a
+misspelled key inside a lookup table or `[output]`, or has a `lookups.<name>` or `output` that is
+not a table stops the run with exit code 1 and a message
 naming the file and the key. An unknown lookup *name* is allowed, for forward compatibility.
 
 ### Sample output
@@ -127,6 +138,11 @@ bad lines: 1 warn, 0 error → weblogstats-errors.log
 `partial` lines were truncated or damaged but still yielded an IP and a User-Agent, and
 `unreadable` lines yielded nothing. The three parts always add up to `total`.
 
+If a dimension raises for a record (a plugin bug), that record is counted as `Unknown` in that
+dimension, the run carries on, and the summary gains a field at the end, for example
+`total=10000 strict=9999 partial=1 unreadable=0 extract_errors=3`. The field counts failed
+extractions, not lines, and is left out entirely when it is zero, as in the run above.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -137,8 +153,15 @@ bad lines: 1 warn, 0 error → weblogstats-errors.log
 
 ### The errors file
 
-Every line that is not a clean match is also written, in full, to the errors file (default
-`weblogstats-errors.log` in the current directory, or `--errors-file PATH`). One entry per line:
+Every line that is not a clean match is also written, in full, to the errors file. Its path is
+the first of these that is set:
+
+1. the `--errors-file PATH` flag
+2. the `WEBLOGSTATS_ERRORS_FILE` environment variable
+3. `errors_file` in the `[output]` table of the [config file](#the-config-file)
+4. the default, `weblogstats-errors.log` in the current directory
+
+The second stderr line always names the path that was used. One entry per line:
 
 ```
 <UTC timestamp> <LEVEL> <kind> <the full original line>
@@ -158,7 +181,7 @@ Every line that is not a clean match is also written, in full, to the errors fil
 
 The file is **truncated at the start of every run**, so an empty file means that run had no bad
 lines. It is opened only after the log and the MMDB have been checked, so a run that fails to
-start leaves the previous file alone. Add the file to your own `.gitignore` if you run the tool
+start (including one with an unusable config file) leaves the previous file alone. Add the file to your own `.gitignore` if you run the tool
 inside a repository; this repository already ignores `weblogstats-errors.log`.
 
 ### Denominator, Unknown and Other
@@ -356,6 +379,7 @@ src/weblogstats/
   cli.py                              # main(argv) composition root, no class
   pipeline.py                         # Pipeline (one pass: parse, extract, observe)
   config/lookup_settings.py           # LookupSettings (per-lookup settings from TOML)
+  config/output_settings.py           # OutputSettings ([output] errors_file from TOML)
   contracts/                          # Protocols and dataclasses shared by every module
     log_record.py  log_source.py  log_parser.py  dimension.py
     geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
@@ -372,7 +396,7 @@ src/weblogstats/
   dimensions/browser_dimension.py     # BrowserDimension
   aggregation/counting_aggregator.py  # CountingAggregator
   formatting/text_report_formatter.py # TextReportFormatter
-config/weblogstats.toml               # default per-lookup settings (cache sizes)
+config/weblogstats.toml               # default settings (cache sizes, errors file)
 tests/
   conftest.py                         # sample_log_path, apache_log_path, geoip_db_path
   fakes/                              # FakeGeoIp, FakeUserAgentLookup
