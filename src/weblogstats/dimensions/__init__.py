@@ -1,0 +1,2 @@
+from weblogstats.dimensions.browser_dimension import BrowserDimension as BrowserDimension
+from weblogstats.dimensions.os_dimension import OsDimension as OsDimension

@@ -1,0 +1,2 @@
+from weblogstats.lookups.label_normalizer import LabelNormalizer as LabelNormalizer
+from weblogstats.lookups.ua_parser_lookup import UaParserLookup as UaParserLookup

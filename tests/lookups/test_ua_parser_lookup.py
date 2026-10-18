@@ -90,6 +90,12 @@ class TestUaParserLookupLabels:
         assert lookup.browser_family(CHROME_MAC) == "Chromium family"
 
 
+def test_is_re_exported_from_the_lookups_package() -> None:
+    from weblogstats.lookups import UaParserLookup as Exported
+
+    assert Exported is UaParserLookup
+
+
 class TestUaParserLookupCaching:
     @pytest.fixture
     def parse_calls(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:

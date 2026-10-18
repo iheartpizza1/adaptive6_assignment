@@ -52,6 +52,12 @@ class TestOsDimension:
         assert self._dimension().extract(_record("something else")) == UNKNOWN
 
 
+def test_is_re_exported_from_the_dimensions_package() -> None:
+    from weblogstats.dimensions import OsDimension as Exported
+
+    assert Exported is OsDimension
+
+
 # The combined format ends with the quoted User-Agent. A truncated line (no closing quote) is
 # matched too, so its UA is still read. This regex is deliberately local: the parser agent's
 # module is not imported.
@@ -71,7 +77,9 @@ def _user_agents(path: Path) -> list[str]:
 class TestOsDimensionOnRealLog:
     @pytest.mark.data
     def test_no_other_label_and_enough_unknown(self, apache_log_path: Path) -> None:
-        dimension = OsDimension(UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser()))
+        dimension = OsDimension(
+            UaParserLookup(LabelNormalizer.for_os(), LabelNormalizer.for_browser())
+        )
         agents = _user_agents(apache_log_path)
         labels = [dimension.extract(_record(agent)) for agent in agents]
         assert len(labels) == 10_000

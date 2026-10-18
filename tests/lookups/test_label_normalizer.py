@@ -39,6 +39,12 @@ class TestLabelNormalizerRules:
         assert normalizer.normalize("windows 7") == "windows 7"
 
 
+def test_is_re_exported_from_the_lookups_package() -> None:
+    from weblogstats.lookups import LabelNormalizer as Exported
+
+    assert Exported is LabelNormalizer
+
+
 class TestLabelNormalizerForOs:
     def test_mac_os_x_becomes_mac_os(self) -> None:
         assert LabelNormalizer.for_os().normalize("Mac OS X") == "Mac OS"

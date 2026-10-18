@@ -52,6 +52,12 @@ class TestBrowserDimension:
         assert self._dimension().extract(_record("something else")) == UNKNOWN
 
 
+def test_is_re_exported_from_the_dimensions_package() -> None:
+    from weblogstats.dimensions import BrowserDimension as Exported
+
+    assert Exported is BrowserDimension
+
+
 # The combined format ends with the quoted User-Agent. A truncated line (no closing quote) is
 # matched too, so its UA is still read. This regex is deliberately local: the parser agent's
 # module is not imported.
