@@ -37,3 +37,55 @@ class TestLabelNormalizerRules:
         normalizer = LabelNormalizer({}, [("Windows", "Windows")])
         assert normalizer.normalize("Not Windows") == "Not Windows"
         assert normalizer.normalize("windows 7") == "windows 7"
+
+
+class TestLabelNormalizerForOs:
+    def test_mac_os_x_becomes_mac_os(self) -> None:
+        assert LabelNormalizer.for_os().normalize("Mac OS X") == "Mac OS"
+
+    @pytest.mark.parametrize(
+        "family", ["Windows", "Windows 7", "Windows XP", "Windows Vista", "Windows 10"]
+    )
+    def test_any_windows_family_becomes_windows(self, family: str) -> None:
+        assert LabelNormalizer.for_os().normalize(family) == "Windows"
+
+    @pytest.mark.parametrize(
+        "family",
+        [
+            "Ubuntu",
+            "Debian",
+            "Fedora",
+            "Linux Mint",
+            "Red Hat",
+            "CentOS",
+            "Gentoo",
+            "Arch Linux",
+            "openSUSE",
+            "Slackware",
+        ],
+    )
+    def test_linux_distributions_become_linux(self, family: str) -> None:
+        assert LabelNormalizer.for_os().normalize(family) == "Linux"
+
+    @pytest.mark.parametrize("family", ["Linux", "iOS", "Android", "Chrome OS"])
+    def test_other_real_families_are_kept(self, family: str) -> None:
+        assert LabelNormalizer.for_os().normalize(family) == family
+
+    @pytest.mark.parametrize("family", [None, "", "Other", "-"])
+    def test_unknown_rules_apply(self, family: str | None) -> None:
+        assert LabelNormalizer.for_os().normalize(family) == UNKNOWN
+
+
+class TestLabelNormalizerForBrowser:
+    @pytest.mark.parametrize(
+        "family", ["Chrome", "Firefox", "Mobile Safari", "IE", "Googlebot", "Edge"]
+    )
+    def test_real_families_are_kept(self, family: str) -> None:
+        assert LabelNormalizer.for_browser().normalize(family) == family
+
+    def test_ie_is_never_mapped_to_edge(self) -> None:
+        assert LabelNormalizer.for_browser().normalize("IE") != "Edge"
+
+    @pytest.mark.parametrize("family", [None, "", "Other", "-"])
+    def test_unknown_rules_apply(self, family: str | None) -> None:
+        assert LabelNormalizer.for_browser().normalize(family) == UNKNOWN
