@@ -134,6 +134,25 @@ class TestMaxMindGeoIp:
         assert geoip.country_name("8.8.8.8") == UNKNOWN
         assert reader.country.call_count == 1
 
+    def test_close_closes_the_reader(self, db_file: Path) -> None:
+        reader = _stub_reader()
+        _geoip(db_file, reader).close()
+        reader.close.assert_called_once()
+
+    def test_context_manager_returns_itself_and_closes_on_exit(self, db_file: Path) -> None:
+        reader = _stub_reader()
+        geoip = _geoip(db_file, reader)
+        with geoip as entered:
+            assert entered is geoip
+            reader.close.assert_not_called()
+        reader.close.assert_called_once()
+
+    def test_context_manager_closes_when_the_body_raises(self, db_file: Path) -> None:
+        reader = _stub_reader()
+        with pytest.raises(RuntimeError), _geoip(db_file, reader):
+            raise RuntimeError("boom")
+        reader.close.assert_called_once()
+
     def test_different_ips_are_looked_up_separately(self, db_file: Path) -> None:
         reader = _stub_reader()
         reader.country.side_effect = [

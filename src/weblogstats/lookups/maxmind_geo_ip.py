@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import geoip2.database
 from geoip2.errors import AddressNotFoundError
@@ -69,3 +69,9 @@ class MaxMindGeoIp:
     def close(self) -> None:
         """Release the database file."""
         self._reader.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
