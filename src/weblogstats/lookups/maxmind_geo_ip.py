@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import geoip2.database
+from geoip2.errors import AddressNotFoundError
+
+from weblogstats.contracts import UNKNOWN
 
 _ACCEPTED_EDITIONS = ("Country", "City")
 
@@ -27,6 +31,7 @@ class MaxMindGeoIp:
                 "Download GeoLite2-Country.mmdb from MaxMind and pass its path "
                 "with --geoip or the GEOIP_DB environment variable."
             )
+        self._cache: dict[str, str] = {}
         self._reader = reader_factory(str(db_path))
         database_type = self._reader.metadata().database_type
         if not any(edition in database_type for edition in _ACCEPTED_EDITIONS):
@@ -37,7 +42,29 @@ class MaxMindGeoIp:
             )
 
     def country_name(self, ip: str) -> str:
-        return ""
+        """The country for ``ip``, or "Unknown" for invalid, non-public or unmapped addresses."""
+        cached = self._cache.get(ip)
+        if cached is None:
+            cached = self._cache[ip] = self._resolve(ip)
+        return cached
+
+    def _resolve(self, ip: str) -> str:
+        try:
+            address = ipaddress.ip_address(ip)
+        except ValueError:
+            return UNKNOWN
+        if not address.is_global:
+            return UNKNOWN
+        try:
+            response = self._reader.country(ip)
+        except (AddressNotFoundError, ValueError):
+            return UNKNOWN
+        # Some anycast and satellite ranges carry only a registered country.
+        return (
+            response.country.names.get("en")
+            or response.registered_country.names.get("en")
+            or UNKNOWN
+        )
 
     def close(self) -> None:
         """Release the database file."""
