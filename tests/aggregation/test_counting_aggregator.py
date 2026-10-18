@@ -21,6 +21,11 @@ def _country_aggregator() -> CountingAggregator:
 
 
 class TestCountingAggregator:
+    def test_is_re_exported_from_the_package(self) -> None:
+        from weblogstats.aggregation import CountingAggregator as Exported
+
+        assert Exported is CountingAggregator
+
     def test_satisfies_the_aggregator_protocol(self) -> None:
         assert isinstance(CountingAggregator(), Aggregator)
 
