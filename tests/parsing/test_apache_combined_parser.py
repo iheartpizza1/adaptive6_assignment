@@ -7,6 +7,7 @@ import pytest
 
 from weblogstats.contracts import LogParser, LogRecord
 from weblogstats.parsing.apache_combined_parser import ApacheCombinedParser
+from weblogstats.sources.file_log_source import FileLogSource
 
 # 1-based fixture line numbers, see tests/fixtures/README.md (blank line 19 is dropped here).
 CLEAN_LINE = 1
@@ -214,3 +215,13 @@ class TestApacheCombinedParser:
         self, parser: ApacheCombinedParser, line: str
     ) -> None:
         assert parser.parse(line) is None
+
+    @pytest.mark.data
+    def test_full_log_has_9999_strict_1_partial_and_no_unreadable(
+        self, parser: ApacheCombinedParser, apache_log_path: Path
+    ) -> None:
+        records = [parser.parse(line) for line in FileLogSource(apache_log_path).lines()]
+        assert len(records) == 10_000
+        assert sum(1 for r in records if r is None) == 0
+        assert sum(1 for r in records if r is not None and not r.partial) == 9_999
+        assert sum(1 for r in records if r is not None and r.partial) == 1
