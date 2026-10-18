@@ -12,6 +12,12 @@ def _observe(aggregator: CountingAggregator, dimension: str, counts: dict[str, i
             aggregator.observe(dimension, label)
 
 
+def _country_aggregator() -> CountingAggregator:
+    aggregator = CountingAggregator()
+    _observe(aggregator, "Country", {"US": 60, "UK": 25, "France": 10, "Peru": 3, "Chad": 2})
+    return aggregator
+
+
 class TestCountingAggregator:
     def test_satisfies_the_aggregator_protocol(self) -> None:
         assert isinstance(CountingAggregator(), Aggregator)
@@ -74,3 +80,80 @@ class TestCountingAggregator:
 
     def test_empty_aggregator_gives_no_reports(self) -> None:
         assert CountingAggregator().snapshot() == []
+
+    def test_labels_below_the_threshold_are_merged_into_one_other_row_last(self) -> None:
+        (report,) = _country_aggregator().snapshot(other_below=5.0)
+
+        assert [label for label, _ in report.rows] == ["US", "UK", "France", "Other"]
+        assert dict(report.rows)["Other"] == pytest.approx(5.0)
+
+    def test_a_label_exactly_at_the_threshold_is_kept(self) -> None:
+        (report,) = _country_aggregator().snapshot(other_below=3.0)
+
+        assert [label for label, _ in report.rows] == ["US", "UK", "France", "Peru", "Other"]
+        assert dict(report.rows)["Other"] == pytest.approx(2.0)
+
+    def test_no_other_row_when_nothing_is_below_the_threshold(self) -> None:
+        (report,) = _country_aggregator().snapshot(other_below=1.0)
+
+        assert "Other" not in dict(report.rows)
+        assert len(report.rows) == 5
+
+    def test_other_stays_last_even_when_it_is_larger_than_the_kept_rows(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "Browser", {"Chrome": 50, "Opera": 20, "Midori": 15, "Lynx": 15})
+
+        (report,) = aggregator.snapshot(other_below=21.0)
+
+        assert [label for label, _ in report.rows] == ["Chrome", "Other"]
+        assert dict(report.rows)["Other"] == pytest.approx(50.0)
+
+    def test_an_existing_label_named_other_is_merged_into_the_other_row(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "Country", {"US": 90, "Other": 4, "Peru": 3, "Chad": 3})
+
+        (report,) = aggregator.snapshot(other_below=5.0)
+
+        assert report.rows == (("US", 90.0), ("Other", pytest.approx(10.0)))
+
+    def test_an_existing_other_label_above_the_threshold_still_comes_last(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "Country", {"Other": 60, "US": 40})
+
+        (report,) = aggregator.snapshot(other_below=5.0)
+
+        assert report.rows == (("US", 40.0), ("Other", 60.0))
+
+    def test_unknown_is_a_normal_label_and_is_merged_into_other_when_small(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "OS", {"Windows": 98, "Unknown": 2})
+
+        (report,) = aggregator.snapshot(other_below=5.0)
+
+        assert report.rows == (("Windows", 98.0), ("Other", 2.0))
+
+    def test_unknown_above_the_threshold_keeps_its_own_row(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "OS", {"Windows": 90, "Unknown": 10})
+
+        (report,) = aggregator.snapshot(other_below=5.0)
+
+        assert report.rows == (("Windows", 90.0), ("Unknown", 10.0))
+
+    def test_the_threshold_applies_to_each_dimension_separately(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "OS", {"Windows": 96, "Linux": 4})
+        _observe(aggregator, "Browser", {"Chrome": 50, "Firefox": 50})
+
+        by_name = {report.name: report.rows for report in aggregator.snapshot(other_below=5.0)}
+
+        assert by_name["OS"] == (("Windows", 96.0), ("Other", 4.0))
+        assert by_name["Browser"] == (("Chrome", 50.0), ("Firefox", 50.0))
+
+    def test_a_threshold_that_merges_everything_leaves_only_other(self) -> None:
+        aggregator = CountingAggregator()
+        _observe(aggregator, "OS", {"Windows": 1, "Linux": 1})
+
+        (report,) = aggregator.snapshot(other_below=100.0)
+
+        assert report.rows == (("Other", 100.0),)
