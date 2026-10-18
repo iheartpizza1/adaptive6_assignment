@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import ipaddress
 from collections.abc import Callable
 from pathlib import Path
@@ -13,6 +14,8 @@ from geoip2.errors import AddressNotFoundError
 from weblogstats.contracts import UNKNOWN
 
 _ACCEPTED_EDITIONS = ("Country", "City")
+# 2 x 1,753 unique client IPs in apache_log.txt.
+DEFAULT_CACHE_SIZE = 3506
 
 
 class MaxMindGeoIp:
@@ -23,15 +26,21 @@ class MaxMindGeoIp:
     """
 
     def __init__(
-        self, db_path: Path, reader_factory: Callable[[str], Any] = geoip2.database.Reader
+        self,
+        db_path: Path,
+        reader_factory: Callable[[str], Any] = geoip2.database.Reader,
+        cache_size: int = DEFAULT_CACHE_SIZE,
     ) -> None:
+        if cache_size < 1:
+            raise ValueError(f"cache_size must be a positive integer, got {cache_size}")
         if not db_path.is_file():
             raise FileNotFoundError(
                 f"GeoIP database not found: {db_path}. "
                 "Download GeoLite2-Country.mmdb from MaxMind and pass its path "
                 "with --geoip or the GEOIP_DB environment variable."
             )
-        self._cache: dict[str, str] = {}
+        # Per-instance LRU cache: wrapping the bound method keeps each object's cache separate.
+        self._cached_resolve = functools.lru_cache(maxsize=cache_size)(self._resolve)
         self._reader = reader_factory(str(db_path))
         database_type = self._reader.metadata().database_type
         if not any(edition in database_type for edition in _ACCEPTED_EDITIONS):
@@ -43,10 +52,7 @@ class MaxMindGeoIp:
 
     def country_name(self, ip: str) -> str:
         """The country for ``ip``, or "Unknown" for invalid, non-public or unmapped addresses."""
-        cached = self._cache.get(ip)
-        if cached is None:
-            cached = self._cache[ip] = self._resolve(ip)
-        return cached
+        return self._cached_resolve(ip)
 
     def _resolve(self, ip: str) -> str:
         try:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -10,6 +11,7 @@ import pytest
 from geoip2.errors import AddressNotFoundError  # the adapter's own test may name geoip2 errors
 
 from weblogstats.contracts import UNKNOWN
+from weblogstats.lookups import maxmind_geo_ip
 from weblogstats.lookups.maxmind_geo_ip import MaxMindGeoIp
 
 
@@ -133,6 +135,42 @@ class TestMaxMindGeoIp:
         assert geoip.country_name("8.8.8.8") == UNKNOWN
         assert geoip.country_name("8.8.8.8") == UNKNOWN
         assert reader.country.call_count == 1
+
+    def test_default_cache_size_is_twice_the_logs_unique_ips(self) -> None:
+        assert maxmind_geo_ip.DEFAULT_CACHE_SIZE == 2 * 1753 == 3506
+        default = inspect.signature(MaxMindGeoIp).parameters["cache_size"].default
+        assert default == maxmind_geo_ip.DEFAULT_CACHE_SIZE
+
+    def test_least_recently_used_ip_is_evicted_when_the_cache_is_full(self, db_file: Path) -> None:
+        reader = _stub_reader()
+        reader.country.return_value = _response(country={"en": "Russia"})
+        geoip = MaxMindGeoIp(db_file, reader_factory=Mock(return_value=reader), cache_size=2)
+        a, b, c = "8.8.8.8", "1.1.1.1", "9.9.9.9"
+        for ip in (a, b, a, c):  # the second A refreshes A, so B is now least recently used
+            geoip.country_name(ip)
+        assert reader.country.call_count == 3
+        geoip.country_name(a)  # still cached
+        assert reader.country.call_count == 3
+        geoip.country_name(b)  # was evicted
+        assert reader.country.call_count == 4
+
+    @pytest.mark.parametrize("cache_size", [0, -1])
+    def test_cache_size_below_one_raises_value_error(self, db_file: Path, cache_size: int) -> None:
+        factory = Mock(return_value=_stub_reader())
+        with pytest.raises(ValueError, match="cache_size"):
+            MaxMindGeoIp(db_file, reader_factory=factory, cache_size=cache_size)
+        factory.assert_not_called()
+
+    def test_instances_do_not_share_a_cache(self, db_file: Path) -> None:
+        first_reader, second_reader = _stub_reader(), _stub_reader()
+        first_reader.country.return_value = _response(country={"en": "Russia"})
+        second_reader.country.return_value = _response(country={"en": "Germany"})
+        first = _geoip(db_file, first_reader)
+        second = _geoip(db_file, second_reader)
+        assert first.country_name("8.8.8.8") == "Russia"
+        assert second.country_name("8.8.8.8") == "Germany"
+        assert first_reader.country.call_count == 1
+        assert second_reader.country.call_count == 1
 
     def test_close_closes_the_reader(self, db_file: Path) -> None:
         reader = _stub_reader()
