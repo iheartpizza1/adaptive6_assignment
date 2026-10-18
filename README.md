@@ -2,6 +2,102 @@
 
 Home Assignment from Adaptive6.
 
+`weblogstats` reads an Apache combined-format access log and prints the share of requests by
+Country, OS and Browser. See [docs/hld.html](docs/hld.html) for the design.
+
+## Requirements
+
+- Python 3.12 or newer (developed and tested on 3.14).
+- Runtime dependencies: `geoip2` (5.x or newer) and `ua-parser` (1.x or newer). Both are installed
+  by `pip`.
+- Development dependencies: `pytest` and `ruff`.
+- The MaxMind **GeoLite2-Country** database (`GeoLite2-Country.mmdb`), downloaded free from a
+  [MaxMind account](https://www.maxmind.com/en/geolite2/signup). The GeoLite2 **ASN** edition will
+  not work: it has no country data, and the tool rejects it at startup.
+- The Apache log file to analyze (`apache_log.txt` for this assignment).
+
+The MMDB and the log are not redistributable and are not committed; both are git-ignored.
+
+## Install
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -e .[dev]
+```
+
+On macOS or Linux use `.venv/bin/python` instead of `.venv\Scripts\python`.
+
+Put `GeoLite2-Country.mmdb` in the `data/` folder, or point the `GEOIP_DB` environment variable (or
+the `--geoip` flag) at it wherever it lives. `weblogstats --help` should now run.
+
+## Usage
+
+_Filled in by Wave 2._
+
+## Extending
+
+_Filled in by Wave 2._
+
+## Development
+
+```powershell
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python -m ruff check .
+.venv\Scripts\python -m ruff format --check .
+```
+
+Tests marked `@pytest.mark.data` need the real log or the MMDB and are skipped when the file is
+missing. They read `APACHE_LOG` and `GEOIP_DB` from the environment, falling back to
+`apache_log.txt` and `data/GeoLite2-Country.mmdb` under the repo root. Set both so they run:
+
+```powershell
+$env:APACHE_LOG = "C:\path\to\apache_log.txt"
+$env:GEOIP_DB = "C:\path\to\GeoLite2-Country.mmdb"
+```
+
+### Layout
+
+```
+src/weblogstats/
+  __init__.py  __main__.py
+  cli.py                              # main(argv) composition root, no class
+  pipeline.py                         # Pipeline
+  contracts/                          # Protocols and dataclasses shared by every module
+    log_record.py  log_source.py  log_parser.py  dimension.py
+    geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
+    aggregator.py  report_formatter.py  run_stats.py  app_config.py  unknown.py
+  sources/file_log_source.py          # FileLogSource
+  parsing/apache_combined_parser.py   # ApacheCombinedParser (strict + lenient)
+  lookups/maxmind_geo_ip.py           # MaxMindGeoIp
+  lookups/ua_parser_lookup.py         # UaParserLookup
+  lookups/label_normalizer.py         # LabelNormalizer (alias tables)
+  dimensions/country_dimension.py     # CountryDimension
+  dimensions/os_dimension.py          # OsDimension
+  dimensions/browser_dimension.py     # BrowserDimension
+  aggregation/counting_aggregator.py  # CountingAggregator
+  formatting/text_report_formatter.py # TextReportFormatter
+tests/
+  conftest.py                         # sample_log_path, apache_log_path, geoip_db_path
+  fakes/                              # FakeGeoIp, FakeUserAgentLookup
+  fixtures/sample.log                 # 20 lines, see tests/fixtures/README.md
+  <mirrors src/: one test module per production class>
+```
+
+After the bootstrap only `contracts/`, the stub `cli.py` and empty sub-packages exist. The other
+modules and `pipeline.py` are added by later waves.
+
+### Conventions
+
+- **One class per file.** Every class (Protocol, dataclass, adapter, fake, test class) lives in its
+  own module named after it in snake_case. `__init__.py` files only re-export.
+- **Only the adapter modules import third-party libraries**: `geoip2` in `maxmind_geo_ip.py` and
+  `ua_parser` in `ua_parser_lookup.py`.
+- **Unknown values are the literal string `"Unknown"`.** A single bad record never raises.
+- **Test first.** Write the failing test, make it pass with the minimum code, refactor, commit.
+- **Branches and PRs.** Work happens on a `dev/*` branch, one per area. Run the full pytest suite,
+  `ruff check` and `ruff format --check`, then open a PR into `master`. Nobody merges their own PR.
+  The full rules are in [docs/agents/00-common.md](docs/agents/00-common.md).
+
 ## GeoIP database (MySQL)
 
 IP → country lookups run against a local MySQL 8.4 database named `geoip`, built from the
