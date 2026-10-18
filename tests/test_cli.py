@@ -6,11 +6,13 @@ import io
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from tests.fakes.fake_geo_ip import FakeGeoIp
+from weblogstats import cli
 from weblogstats.cli import DEFAULT_ERRORS_FILE, DEFAULT_GEOIP_PATH, main, parse_args
 from weblogstats.contracts import AppConfig, GeoIpLookup
 
@@ -36,8 +38,12 @@ def _write_log(tmp_path: Path, *lines: str) -> Path:
 class TestCli:
     # --- argument parsing -------------------------------------------------------------------
 
-    def test_parse_args_builds_an_app_config_and_the_errors_file(self) -> None:
-        config, errors_file, _ = parse_args(
+    def test_parse_args_builds_the_whole_app_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "w.toml").write_text("", encoding="utf-8")
+        config = parse_args(
             [
                 "access.log",
                 "--geoip",
@@ -48,6 +54,8 @@ class TestCli:
                 "1.5",
                 "--errors-file",
                 "bad.log",
+                "--config",
+                "w.toml",
             ]
         )
         assert config == AppConfig(
@@ -55,24 +63,28 @@ class TestCli:
             geoip_path=Path("g.mmdb"),
             output_format="text",
             other_below=1.5,
+            errors_file=Path("bad.log"),
+            config_path=Path("w.toml"),
         )
-        assert errors_file == Path("bad.log")
 
-    def test_parse_args_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("GEOIP_DB", raising=False)
-        config, errors_file, _ = parse_args(["access.log"])
+    def test_parse_args_defaults(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        for name in ("GEOIP_DB", "WEBLOGSTATS_CONFIG", "WEBLOGSTATS_ERRORS_FILE"):
+            monkeypatch.delenv(name, raising=False)
+        config = parse_args(["access.log"])
         assert config.output_format == "text"
         assert config.other_below is None
         assert config.geoip_path == DEFAULT_GEOIP_PATH == Path("data/GeoLite2-Country.mmdb")
-        assert errors_file == DEFAULT_ERRORS_FILE == Path("weblogstats-errors.log")
+        assert config.errors_file == DEFAULT_ERRORS_FILE == Path("weblogstats-errors.log")
+        assert config.config_path is None
 
     def test_geoip_defaults_to_the_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("GEOIP_DB", "from-env.mmdb")
-        assert parse_args(["access.log"])[0].geoip_path == Path("from-env.mmdb")
+        assert parse_args(["access.log"]).geoip_path == Path("from-env.mmdb")
 
     def test_geoip_flag_beats_the_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("GEOIP_DB", "from-env.mmdb")
-        assert parse_args(["a.log", "--geoip", "flag.mmdb"])[0].geoip_path == Path("flag.mmdb")
+        assert parse_args(["a.log", "--geoip", "flag.mmdb"]).geoip_path == Path("flag.mmdb")
 
     def test_missing_log_argument_is_a_usage_error(self) -> None:
         with pytest.raises(SystemExit) as exc:
@@ -121,6 +133,30 @@ class TestCli:
             "Country:\nFrance 100.00%\n\nOS:\nWindows 100.00%\n\nBrowser:\nChrome 100.00%\n"
         )
         assert captured.err.splitlines()[0] == "total=1 strict=1 partial=0 unreadable=0"
+
+    def test_the_summary_shows_extract_errors_when_a_dimension_raises(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        def explode(record: object) -> str:
+            raise RuntimeError("plugin bug")
+
+        real_build = cli.build_dimensions
+
+        def with_a_broken_dimension(*args: object) -> list[object]:
+            return [*real_build(*args), SimpleNamespace(name="Broken", extract=explode)]
+
+        monkeypatch.setattr(cli, "build_dimensions", with_a_broken_dimension)
+        log = _write_log(tmp_path, ONE_LINE, ONE_LINE)
+        errors = tmp_path / "errors.log"
+        assert main([str(log), "--errors-file", str(errors)], geoip_factory=_geoip) == 0
+        captured = capsys.readouterr()
+        assert captured.err.splitlines()[0] == (
+            "total=2 strict=2 partial=0 unreadable=0 extract_errors=2"
+        )
+        assert captured.out.endswith("Broken:\nUnknown 100.00%\n")
 
     def test_the_geoip_factory_receives_the_geoip_path(self, tmp_path: Path) -> None:
         seen: list[Path] = []

@@ -52,6 +52,7 @@ def _setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[SimpleNames
     """A one-line log, an isolated cwd and environment, and the spies."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("WEBLOGSTATS_CONFIG", raising=False)
+    monkeypatch.delenv("WEBLOGSTATS_ERRORS_FILE", raising=False)
     log = tmp_path / "access.log"
     log.write_text(ONE_LINE + "\n", encoding="utf-8")
     return _spies(monkeypatch), [str(log), "--errors-file", str(tmp_path / "errors.log")]
@@ -63,8 +64,11 @@ class TestCliConfig:
     def test_the_flag_is_the_first_choice(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "flag.toml").write_text(SIZES, encoding="utf-8")
+        (tmp_path / "from-env.toml").write_text(SIZES, encoding="utf-8")
         monkeypatch.setenv("WEBLOGSTATS_CONFIG", "from-env.toml")
-        assert parse_args(["a.log", "--config", "flag.toml"])[2] == Path("flag.toml")
+        assert parse_args(["a.log", "--config", "flag.toml"]).config_path == Path("flag.toml")
 
     def test_the_env_var_is_the_second_choice(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -72,8 +76,9 @@ class TestCliConfig:
         monkeypatch.chdir(tmp_path)
         (tmp_path / "config").mkdir()
         (tmp_path / DEFAULT_CONFIG_PATH).write_text(SIZES, encoding="utf-8")
+        (tmp_path / "from-env.toml").write_text(SIZES, encoding="utf-8")
         monkeypatch.setenv("WEBLOGSTATS_CONFIG", "from-env.toml")
-        assert parse_args(["a.log"])[2] == Path("from-env.toml")
+        assert parse_args(["a.log"]).config_path == Path("from-env.toml")
 
     def test_the_default_file_is_used_when_it_exists(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -82,21 +87,25 @@ class TestCliConfig:
         monkeypatch.delenv("WEBLOGSTATS_CONFIG", raising=False)
         (tmp_path / "config").mkdir()
         (tmp_path / DEFAULT_CONFIG_PATH).write_text(SIZES, encoding="utf-8")
-        assert parse_args(["a.log"])[2] == DEFAULT_CONFIG_PATH == Path("config/weblogstats.toml")
+        assert (
+            parse_args(["a.log"]).config_path
+            == DEFAULT_CONFIG_PATH
+            == Path("config/weblogstats.toml")
+        )
 
     def test_there_is_no_config_when_nothing_is_given_and_no_default_exists(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("WEBLOGSTATS_CONFIG", raising=False)
-        assert parse_args(["a.log"])[2] is None
+        assert parse_args(["a.log"]).config_path is None
 
     def test_an_empty_env_var_is_ignored(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("WEBLOGSTATS_CONFIG", "")
-        assert parse_args(["a.log"])[2] is None
+        assert parse_args(["a.log"]).config_path is None
 
     # --- sizes reach the lookups ------------------------------------------------------------
 

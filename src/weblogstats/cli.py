@@ -10,7 +10,7 @@ from contextlib import AbstractContextManager, ExitStack
 from pathlib import Path
 
 from weblogstats.aggregation import CountingAggregator
-from weblogstats.config import LookupSettings
+from weblogstats.config import LookupSettings, OutputSettings
 from weblogstats.contracts import AppConfig, Dimension, GeoIpLookup, ReportFormatter
 from weblogstats.dimensions import BrowserDimension, CountryDimension, OsDimension
 from weblogstats.formatting import TextReportFormatter
@@ -24,6 +24,7 @@ DEFAULT_GEOIP_PATH = Path("data/GeoLite2-Country.mmdb")
 DEFAULT_ERRORS_FILE = Path("weblogstats-errors.log")
 DEFAULT_CONFIG_PATH = Path("config/weblogstats.toml")
 CONFIG_ENV_VAR = "WEBLOGSTATS_CONFIG"
+ERRORS_FILE_ENV_VAR = "WEBLOGSTATS_ERRORS_FILE"
 
 # The names of the [lookups.<name>] tables in the config file.
 GEOIP_LOOKUP = "geoip"
@@ -72,10 +73,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--errors-file",
         type=Path,
-        default=DEFAULT_ERRORS_FILE,
+        default=None,
         metavar="PATH",
         help="where partial and unreadable lines are logged; truncated on every run "
-        "(default: %(default)s)",
+        f"(default: ${ERRORS_FILE_ENV_VAR}, else [output] errors_file in the config file, "
+        f"else {DEFAULT_ERRORS_FILE})",
     )
     parser.add_argument(
         "--config",
@@ -88,21 +90,36 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[AppConfig, Path, Path | None]:
-    """Parse the command line into an AppConfig, the errors-file path and the settings path.
+def parse_args(argv: list[str] | None = None) -> AppConfig:
+    """Parse the command line, the environment and the config file into an AppConfig.
 
-    The two paths travel beside the config because AppConfig has no field for them. The settings
-    path is the --config flag, else $WEBLOGSTATS_CONFIG, else the default file if it exists, else
-    None. Exits with status 2 on a usage error.
+    The config file is the --config flag, else $WEBLOGSTATS_CONFIG, else the default file if it
+    exists, else none. The errors file is the --errors-file flag, else $WEBLOGSTATS_ERRORS_FILE,
+    else the config file's ``[output] errors_file``, else the default. Exits with status 2 on a
+    usage error. Raises FileNotFoundError or ValueError for an unusable config file.
     """
     namespace = _build_parser().parse_args(argv)
-    config = AppConfig(
+    config_path = _resolve_settings_path(namespace.config)
+    return AppConfig(
         log_path=namespace.log,
         geoip_path=namespace.geoip,
         output_format=namespace.output_format,
         other_below=namespace.other_below,
+        errors_file=_resolve_errors_file(namespace.errors_file, config_path),
+        config_path=config_path,
     )
-    return config, namespace.errors_file, _resolve_settings_path(namespace.config)
+
+
+def _resolve_errors_file(flag: Path | None, config_path: Path | None) -> Path:
+    if flag is not None:
+        return flag
+    if os.environ.get(ERRORS_FILE_ENV_VAR):
+        return Path(os.environ[ERRORS_FILE_ENV_VAR])
+    if config_path is not None:
+        from_file = OutputSettings.load(config_path).errors_file
+        if from_file is not None:
+            return from_file
+    return DEFAULT_ERRORS_FILE
 
 
 def _resolve_settings_path(flag: Path | None) -> Path | None:
@@ -128,15 +145,15 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = _open_m
 
     ``geoip_factory`` exists so tests can inject a fake instead of opening the real MMDB.
     """
-    config, errors_file, settings_path = parse_args(argv)
     _use_utf8_output()
     with ExitStack() as stack:
         try:
             # Every input is checked before BadLineLog opens, because opening truncates the file.
+            config = parse_args(argv)
             settings = (
                 LookupSettings.defaults()
-                if settings_path is None
-                else LookupSettings.load(settings_path)
+                if config.config_path is None
+                else LookupSettings.load(config.config_path)
             )
             source = FileLogSource(config.log_path)
             geoip = geoip_factory(
@@ -144,7 +161,7 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = _open_m
             )
             if isinstance(geoip, AbstractContextManager):
                 stack.enter_context(geoip)
-            bad_lines = stack.enter_context(BadLineLog(errors_file))
+            bad_lines = stack.enter_context(BadLineLog(config.errors_file))
         except (OSError, ValueError, RuntimeError) as error:
             return _fail(error)
         aggregator = CountingAggregator()
@@ -163,7 +180,7 @@ def main(argv: list[str] | None = None, *, geoip_factory: GeoIpFactory = _open_m
         print(stats.summary(), file=sys.stderr)
         print(
             f"bad lines: {bad_lines.warn_count} warn, {bad_lines.error_count} error"
-            f" → {errors_file}",
+            f" → {config.errors_file}",
             file=sys.stderr,
         )
     return 0
