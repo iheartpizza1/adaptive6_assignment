@@ -20,21 +20,61 @@ The MMDB and the log are not redistributable and are not committed; both are git
 
 ## Install
 
+Run these from the repository root in PowerShell. Create the virtual environment and install the
+package into it:
+
 ```powershell
 python -m venv .venv
-.venv\Scripts\python -m pip install -e .[dev]
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-On macOS or Linux use `.venv/bin/python` instead of `.venv\Scripts\python`.
+PowerShell does not run a relative path such as `.venv\Scripts\python` without the leading `.\`,
+so always write `.\.venv\Scripts\...` as above. On macOS or Linux use `.venv/bin/python` instead.
 
 Put `GeoLite2-Country.mmdb` in the `data/` folder, or point the `GEOIP_DB` environment variable (or
-the `--geoip` flag) at it wherever it lives. `weblogstats --help` should now run.
+the `--geoip` flag) at it wherever it lives. Check the install with:
+
+```powershell
+.\.venv\Scripts\weblogstats.exe --help
+```
 
 ## Usage
 
+Installing the package does not add `weblogstats` to your PATH. Use one of the two ways below.
+
+**Option A: no activation (recommended).** Call the executable in the venv directly:
+
 ```powershell
-weblogstats apache_log.txt --geoip data/GeoLite2-Country.mmdb
-python -m weblogstats apache_log.txt --geoip data/GeoLite2-Country.mmdb   # same thing
+.\.venv\Scripts\weblogstats.exe apache_log.txt --geoip data\GeoLite2-Country.mmdb
+```
+
+**Option B: activate the venv for this PowerShell window.** Then `weblogstats` works by its short
+name, and the prompt shows `(.venv)`:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb
+deactivate
+```
+
+Activation lasts only for the current window, so activate again in each new one. If PowerShell
+reports that running scripts is disabled, allow local scripts once for your user account, then
+activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+You can also run it as a module, with no activation and no executable:
+
+```powershell
+.\.venv\Scripts\python.exe -m weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb
+```
+
+For this assignment, the full command that writes the report to a file is:
+
+```powershell
+.\.venv\Scripts\weblogstats.exe apache_log.txt --geoip data\GeoLite2-Country.mmdb > report.txt
 ```
 
 The report goes to **stdout** and the run summary to **stderr**, so `> report.txt` keeps the two
@@ -357,9 +397,9 @@ and the aggregator stay unchanged. See [HLD section 9](docs/hld.html#extensibili
 ## Development
 
 ```powershell
-.venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check .
-.venv\Scripts\python -m ruff format --check .
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
 ```
 
 Tests marked `@pytest.mark.data` need the real log or the MMDB and are skipped when the file is
