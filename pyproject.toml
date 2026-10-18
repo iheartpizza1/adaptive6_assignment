@@ -34,6 +34,8 @@ markers = [
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# db/ holds the separate MySQL GeoIP tooling, not part of the weblogstats package.
+extend-exclude = ["db"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

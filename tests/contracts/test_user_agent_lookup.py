@@ -7,7 +7,9 @@ from weblogstats.contracts import UserAgentLookup
 
 class TestUserAgentLookup:
     def test_object_with_the_members_satisfies_the_protocol(self) -> None:
-        candidate = SimpleNamespace(os_family=lambda ua: "Unknown", browser_family=lambda ua: "Unknown")
+        candidate = SimpleNamespace(
+            os_family=lambda ua: "Unknown", browser_family=lambda ua: "Unknown"
+        )
         assert isinstance(candidate, UserAgentLookup)
 
     def test_object_missing_the_members_does_not_satisfy_the_protocol(self) -> None:
