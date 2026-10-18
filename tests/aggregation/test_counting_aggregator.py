@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 import pytest
 
 from weblogstats.aggregation.counting_aggregator import CountingAggregator
@@ -157,3 +159,24 @@ class TestCountingAggregator:
         (report,) = aggregator.snapshot(other_below=100.0)
 
         assert report.rows == (("Other", 100.0),)
+
+    def test_a_label_at_the_threshold_is_kept_despite_float_rounding(self) -> None:
+        # 29 / 100 * 100 is 28.999999999999996 in floating point.
+        aggregator = CountingAggregator()
+        _observe(aggregator, "OS", {"Windows": 71, "Linux": 29})
+
+        (report,) = aggregator.snapshot(other_below=29.0)
+
+        assert [label for label, _ in report.rows] == ["Windows", "Linux"]
+
+    @pytest.mark.parametrize("other_below", [None, 1.0, 5.0, 20.0])
+    def test_percentages_of_each_report_sum_to_one_hundred(self, other_below: float | None) -> None:
+        rng = random.Random(20261018)
+        for _ in range(25):
+            aggregator = CountingAggregator()
+            counts = {f"label{i}": rng.randint(1, 500) for i in range(rng.randint(1, 40))}
+            _observe(aggregator, "Random", counts)
+
+            (report,) = aggregator.snapshot(other_below=other_below)
+
+            assert sum(percent for _, percent in report.rows) == pytest.approx(100.0, abs=1e-9)
