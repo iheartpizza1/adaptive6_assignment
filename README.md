@@ -49,9 +49,34 @@ apart. Both streams are written as UTF-8.
 | `--format {text}` | `text` | Output format. Only `text` exists today; see [Extending](#extending). |
 | `--other-below FLOAT` | off | Roll every row below this percentage into one `Other` row at the end of its block. |
 | `--errors-file PATH` | `weblogstats-errors.log` | Where partial and unreadable lines are logged. See [The errors file](#the-errors-file). |
+| `--config PATH` | `$WEBLOGSTATS_CONFIG`, else `config/weblogstats.toml` if it exists | TOML file with per-lookup settings. See [The config file](#the-config-file). |
 | `-h`, `--help` | | Show the usage and exit. |
 
 The `GEOIP_DB` environment variable sets the default for `--geoip`; the flag wins when both are given.
+
+### The config file
+
+Lookup cache sizes are set per lookup in a TOML file. The repository ships
+[`config/weblogstats.toml`](config/weblogstats.toml):
+
+```toml
+# Per-lookup settings. Add a [lookups.<name>] table for a new lookup.
+[lookups.geoip]
+cache_size = 3506   # 2 x 1,753 unique client IPs in apache_log.txt
+
+[lookups.user_agent]
+cache_size = 1116   # 2 x 558 distinct User-Agent strings reaching the cache in apache_log.txt
+```
+
+`cache_size` is the number of entries the lookup's LRU cache holds, an integer of at least 1.
+A lookup with no table (or no `cache_size`) keeps the default built into its constructor.
+
+The file is found in this order: the `--config` flag, then the `WEBLOGSTATS_CONFIG` environment
+variable, then `config/weblogstats.toml` relative to the current directory if it exists, and
+otherwise no file at all (every lookup uses its own default). A file that is missing, is not valid
+TOML, has a bad value (zero, negative, a string, a boolean), has a misspelled key inside a lookup
+table, or has a `lookups.<name>` that is not a table stops the run with exit code 1 and a message
+naming the file and the key. An unknown lookup *name* is allowed, for forward compatibility.
 
 ### Sample output
 
@@ -107,7 +132,7 @@ bad lines: 1 warn, 0 error → weblogstats-errors.log
 | Code | Meaning |
 |---|---|
 | `0` | The report was printed. |
-| `1` | The log file is missing, the MMDB is missing or unreadable, the MMDB is the wrong edition (for example GeoLite2-ASN), or the errors file cannot be written. A one-line `weblogstats: error: ...` goes to stderr and **no report is printed**. |
+| `1` | The log file is missing, the MMDB is missing or unreadable, the MMDB is the wrong edition (for example GeoLite2-ASN), the config file is missing or invalid, or the errors file cannot be written. A one-line `weblogstats: error: ...` goes to stderr and **no report is printed**. |
 | `2` | Usage error, such as a missing `log` argument or a non-numeric `--other-below`. |
 
 ### The errors file
@@ -239,6 +264,32 @@ The aggregator and the formatter know nothing about dimensions, so nothing else 
 `Unknown 5.26%`. Update `tests/fixtures/sample.expected.txt` for the golden test when you
 register a real dimension.
 
+### Configuring a new lookup
+
+Goal: give a new lookup (say `geo_city`, built in `cli.py`) its own cache size from the config file.
+
+1. **Test first**, in `tests/test_cli_config.py` style: write a TOML file with a `[lookups.geo_city]`
+   table, run `main` with `--config`, and assert the size reaches the lookup (see how the existing
+   tests spy on the geoip factory and on `UaParserLookup`).
+2. **Add the table** to `config/weblogstats.toml`:
+
+   ```toml
+   [lookups.geo_city]
+   cache_size = 2000
+   ```
+
+3. **Read it where the lookup is built**, in `cli.py`, with a module constant for the name next to
+   the other two (`GEOIP_LOOKUP`, `USER_AGENT_LOOKUP`):
+
+   ```python
+   GEO_CITY_LOOKUP = "geo_city"
+   ...
+   GeoCityLookup(cache_size=settings.cache_size(GEO_CITY_LOOKUP, GeoCityLookup.DEFAULT_CACHE_SIZE))
+   ```
+
+`LookupSettings` itself does not change: it holds a generic name to settings mapping, so a new
+lookup only adds a section to the file and the one line above.
+
 ### New output format
 
 Goal: `--format json`.
@@ -304,6 +355,7 @@ src/weblogstats/
   __init__.py  __main__.py
   cli.py                              # main(argv) composition root, no class
   pipeline.py                         # Pipeline (one pass: parse, extract, observe)
+  config/lookup_settings.py           # LookupSettings (per-lookup settings from TOML)
   contracts/                          # Protocols and dataclasses shared by every module
     log_record.py  log_source.py  log_parser.py  dimension.py
     geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
@@ -320,6 +372,7 @@ src/weblogstats/
   dimensions/browser_dimension.py     # BrowserDimension
   aggregation/counting_aggregator.py  # CountingAggregator
   formatting/text_report_formatter.py # TextReportFormatter
+config/weblogstats.toml               # default per-lookup settings (cache sizes)
 tests/
   conftest.py                         # sample_log_path, apache_log_path, geoip_db_path
   fakes/                              # FakeGeoIp, FakeUserAgentLookup

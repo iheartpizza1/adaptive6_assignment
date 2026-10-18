@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Statistical Reporting Module — HLD v1.4.0</title>
+  <title>Statistical Reporting Module — HLD v1.5.0</title>
   <style>
     :root {
       --ink: #1c1914;
@@ -218,7 +218,7 @@
       <h1>Statistical Reporting Module</h1>
       <p class="sub">High-level design for an Apache log analyzer that reports request share by Country, OS, and Browser — written so implementation can fan out across git worktrees.</p>
       <div class="meta">
-        <span class="chip" id="doc-version">Version 1.4.0</span>
+        <span class="chip" id="doc-version">Version 1.5.0</span>
         <span class="chip">18 Oct 2026</span>
         <span class="chip">Language: Python ≥ 3.12</span>
         <span class="chip">Runtime target: ~10k log lines, streamable</span>
@@ -275,6 +275,11 @@
               <td>1.4.0</td>
               <td>2026-10-18</td>
               <td>Bad lines are now also written to an errors file (§11): <code>WARN partial</code> / <code>ERROR unreadable</code>, with a UTC timestamp and the full line. It is built by the parser agent as <code>LoggingParser</code> + <code>BadLineLog</code> (no contract change) and wired by compose via <code>--errors-file</code>. The parser and compose briefs are updated.</td>
+            </tr>
+            <tr>
+              <td>1.5.0</td>
+              <td>2026-10-18</td>
+              <td>Lookup cache sizes now come from a TOML config file (<code>config/weblogstats.toml</code>, read with the stdlib <code>tomllib</code>), keyed per lookup as <code>[lookups.&lt;name&gt;]</code>: §5 gains a Config row, §8 lists <code>config/lookup_settings.py</code> (<code>LookupSettings</code>), and §9 gains a "New lookup setting" paragraph. The CLI takes <code>--config</code> / <code>WEBLOGSTATS_CONFIG</code>.</td>
             </tr>
           </tbody>
         </table>
@@ -477,6 +482,11 @@
               <td>CLI</td>
               <td><code>argparse</code> in <code>python -m weblogstats</code></td>
               <td>No extra framework. Flags: log path, geoip path, optional other-threshold, output format.</td>
+            </tr>
+            <tr>
+              <td>Config</td>
+              <td>TOML via stdlib <code>tomllib</code>, <code>config/weblogstats.toml</code></td>
+              <td>Per-lookup settings (cache sizes), no extra dependency.</td>
             </tr>
             <tr>
               <td>Tests</td>
@@ -715,6 +725,7 @@ src/weblogstats/
   __init__.py  __main__.py
   cli.py                              # main(argv) composition root, no class        [Wave 2]
   pipeline.py                         # Pipeline                                     [Wave 2]
+  config/lookup_settings.py           # LookupSettings                               [compose]
   contracts/                          #                                              [Wave 0]
     log_record.py  log_source.py  log_parser.py  dimension.py
     geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
@@ -731,6 +742,7 @@ src/weblogstats/
   dimensions/browser_dimension.py     # BrowserDimension                             [ua]
   aggregation/counting_aggregator.py  # CountingAggregator                           [report]
   formatting/text_report_formatter.py # TextReportFormatter                          [report]
+config/weblogstats.toml               # default per-lookup settings (cache sizes)    [compose]
 tests/
   fakes/fake_geo_ip.py  fakes/fake_user_agent_lookup.py                              [Wave 0]
   fixtures/sample.log                                                                [Wave 0]
@@ -751,6 +763,7 @@ tests/
         <p><strong>New output format</strong> — implement <code>ReportFormatter</code>, one file per formatter (<code>formatting/json_report_formatter.py</code>, <code>formatting/csv_report_formatter.py</code>). Choose with <code>--format text|json</code>.</p>
         <p><strong>New log dialect</strong> — implement <code>LogParser</code>. Keep <code>LogRecord</code> stable; unknown fields can be ignored.</p>
         <p><strong>New geo source</strong> — implement <code>GeoIpLookup</code> (offline CSV, test fake). Production stays on MaxMind file.</p>
+        <p><strong>New lookup setting</strong> — add a <code>[lookups.&lt;name&gt;]</code> table to <code>config/weblogstats.toml</code> (today only <code>cache_size</code>), and read it where the lookup is built in <code>cli.py</code> with <code>settings.cache_size("&lt;name&gt;", default)</code>. <code>LookupSettings</code> stores a generic name → settings mapping, so it needs no change; an unknown key inside a table, or a bad value, fails at start-up with the file and key named.</p>
         <p><strong>Filters later</strong> — optional <code>RecordFilter</code> protocol in front of dimensions (e.g. only GET, only 200, or <code>BotFilter</code> behind <code>--exclude-bots</code>, using ua-parser's device family <code>Spider</code> plus a small regex for feed readers). Not built in v1. Filtered records leave the denominator, and the stderr summary says how many.</p>
       </div>
       <div class="feedback">
@@ -940,7 +953,7 @@ Chrome 35.45%
   </footer>
 
   <script>
-    const VERSION = "1.4.0";
+    const VERSION = "1.5.0";
     const STORAGE_KEY = "adaptive6-hld-comments-" + VERSION;
     const boxes = [...document.querySelectorAll("textarea[data-key]")];
 
