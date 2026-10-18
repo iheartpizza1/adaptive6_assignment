@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Statistical Reporting Module — HLD v1.3.0</title>
+  <style>
+    :root {
+      --ink: #1c1914;
+      --muted: #5c564c;
+      --paper: #f6f1e7;
+      --card: #fffdf8;
+      --line: #d9d0c0;
+      --accent: #0f6b63;
+      --accent-ink: #08443f;
+      --warn: #8a4b12;
+      --chip: #e8efe9;
+      --shadow: 0 10px 30px rgba(28, 25, 20, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #e8f3f1 0%, transparent 50%),
+        var(--paper);
+      line-height: 1.55;
+    }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 22px 140px; }
+
+    header.hero {
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      border-radius: 18px;
+    }
+
+    .kicker {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.15; }
+    .sub { color: var(--muted); margin: 0 0 18px; font-size: 17px; }
+
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px;
+    }
+    .chip {
+      background: var(--chip);
+      border: 1px solid #c9d9ce;
+      color: var(--accent-ink);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    nav.toc {
+      margin: 22px 0 0;
+      padding: 14px 16px;
+      border-top: 1px dashed var(--line);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+    }
+    nav.toc a { color: var(--accent-ink); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    nav.toc ol { margin: 8px 0 0; padding-left: 18px; columns: 2; gap: 22px; }
+    @media (max-width: 720px) { nav.toc ol { columns: 1; } }
+
+    section.block {
+      margin-top: 22px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    section.block h2 {
+      margin: 0;
+      padding: 18px 24px 0;
+      font-size: 24px;
+    }
+    .body { padding: 8px 24px 18px; }
+    p { margin: 12px 0; }
+    ul, ol { margin: 8px 0 12px; padding-left: 22px; }
+    li { margin: 4px 0; }
+    code, .mono {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: #1c1914;
+      color: #f4efe6;
+      padding: 14px 16px;
+      border-radius: 12px;
+      overflow: auto;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .note {
+      background: #fff6e8;
+      border: 1px solid #efd7b0;
+      color: var(--warn);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 8px 6px;
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+
+    .diagram {
+      background: #fbf8f2;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+    .diagram svg { display: block; width: 100%; height: auto; }
+
+    .feedback {
+      border-top: 1px dashed var(--line);
+      padding: 14px 24px 18px;
+      background: #faf7f1;
+    }
+    .feedback label {
+      display: block;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    textarea {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+    textarea:focus { outline: 2px solid #9ec9c3; border-color: var(--accent); }
+
+    footer.actions {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(28, 25, 20, 0.92);
+      color: #f6f1e7;
+      backdrop-filter: blur(8px);
+      padding: 12px 18px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+    button {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: #7ee0d4; color: #083833; }
+    .ghost { background: transparent; color: #f6f1e7; border: 1px solid #8d867a; }
+    .toast {
+      position: fixed;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent-ink);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="kicker">Adaptive6 R&amp;D · Phase 1</p>
+      <h1>Statistical Reporting Module</h1>
+      <p class="sub">High-level design for an Apache log analyzer that reports request share by Country, OS, and Browser — written so implementation can fan out across git worktrees.</p>
+      <div class="meta">
+        <span class="chip" id="doc-version">Version 1.3.0</span>
+        <span class="chip">18 Oct 2026</span>
+        <span class="chip">Language: Python ≥ 3.12</span>
+        <span class="chip">Runtime target: ~10k log lines, streamable</span>
+      </div>
+      <nav class="toc">
+        <strong>Contents</strong>
+        <ol>
+          <li><a href="#changelog">Changelog</a></li>
+          <li><a href="#goals">Goals, non-goals, constraints</a></li>
+          <li><a href="#input">Input profile (real log)</a></li>
+          <li><a href="#assumptions">Assumptions and trade-offs</a></li>
+          <li><a href="#tech">Technology choices</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#flow">Main processing flow</a></li>
+          <li><a href="#abstractions">Key abstractions and interfaces</a></li>
+          <li><a href="#extensibility">Extensibility</a></li>
+          <li><a href="#output">Output contract</a></li>
+          <li><a href="#errors">Errors, Unknown, Other</a></li>
+          <li><a href="#worktrees">Subagent plan</a></li>
+          <li><a href="#testing">Testing and verification</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <section class="block" id="changelog" data-section="Changelog">
+      <h2>1. Changelog</h2>
+      <div class="body">
+        <table>
+          <thead>
+            <tr><th>Version</th><th>Date</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1.0.0</td>
+              <td>2026-10-18</td>
+              <td>Initial HLD: streaming pipeline, dimension plugins, GeoLite2 + UA parsing, worktree bootstrap plan, SVG flow diagrams.</td>
+            </tr>
+            <tr>
+              <td>1.1.0</td>
+              <td>2026-10-18</td>
+              <td>Revised from a profile of the real <code>apache_log.txt</code>: new §3 Input profile; denominator is now all 10,000 requests (the brief's wording), so no line is dropped; lenient parser fallback for the truncated line; <code>-</code> UA / <code>-</code> bytes / <code>\x</code> escapes handled; label normalization table for ua-parser families; bots kept by default; flagged that the downloaded GeoLite2 <em>ASN</em> DB cannot resolve countries.</td>
+            </tr>
+            <tr>
+              <td>1.2.0</td>
+              <td>2026-10-18</td>
+              <td>Feedback on 1.1.0: §6 Architecture now shows the lookup adapters (<code>GeoIpLookup</code> → MaxMindGeoIp → GeoLite2-Country.mmdb, plus <code>UserAgentLookup</code> for symmetry) and gains a GeoIP lookup paragraph. §3: the GeoLite2-Country DB has been downloaded, so the blocker is resolved.</td>
+            </tr>
+            <tr>
+              <td>1.3.0</td>
+              <td>2026-10-18</td>
+              <td>Feedback on 1.2.0: §5 now says the README must list requirements (Python ≥ 3.12, deps, MMDB), install, usage and how to extend, and names which agent writes each part. §8 adds a one-class-per-file rule and the full module layout (contracts become a package). §12 is rewritten as the subagent plan: Sonnet / high effort, one <code>dev/*</code> branch + worktree per agent, a brief per agent in <code>docs/agents/</code>, PRs into master after tests pass. §13 adds the mandatory TDD loop and data-gated integration tests.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="note">Each design iteration bumps this version and adds a row here. Feedback from the boxes below is the input for the next bump.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-changelog">Your comments on this section</label>
+        <textarea id="fb-changelog" data-key="changelog" placeholder="What should change in the changelog / versioning process?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="goals" data-section="Goals, non-goals, constraints">
+      <h2>2. Goals, non-goals, constraints</h2>
+      <div class="body">
+        <p><strong>Goal.</strong> Read one Apache combined-format log file and print three independent frequency reports — Country, OS, Browser — as percentages of <em>all</em> requests in the file (the brief says “across all 10,000 requests”), sorted descending, two decimal places.</p>
+        <div class="grid-2">
+          <div>
+            <p><strong>Must</strong></p>
+            <ul>
+              <li>Run locally with no web APIs (MaxMind downloadable DB only).</li>
+              <li>Stay correct on the 10k-line sample and remain streaming so larger files do not require loading the whole file into memory.</li>
+              <li>Make adding a fourth dimension (e.g. HTTP status class) a new class + one registration line, not a pipeline rewrite.</li>
+            </ul>
+          </div>
+          <div>
+            <p><strong>Not in v1</strong></p>
+            <ul>
+              <li>Live tailing, HTTP service, or dashboard UI.</li>
+              <li>Per-path or time-window reports (easy later via extra dimensions / filters).</li>
+              <li>Distributed processing. 10k–millions of lines is a single process.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="feedback">
+        <label for="fb-goals">Your comments on this section</label>
+        <textarea id="fb-goals" data-key="goals" placeholder="Scope too wide? Missing a must-have?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="input" data-section="Input profile">
+      <h2>3. Input profile (<code>apache_log.txt</code>)</h2>
+      <div class="body">
+        <p>Measured on the real input file, not inferred from the single sample line in the brief. Each row is a fact the parser or a dimension has to handle.</p>
+        <table>
+          <thead><tr><th>Observation</th><th>Count</th><th>Design consequence</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Lines / encoding</td>
+              <td>10,000 lines, 2.3 MB, LF endings, pure ASCII</td>
+              <td>One streaming pass is fine. Read as UTF-8 with <code>errors="replace"</code> so a stray byte in another log never crashes the run.</td>
+            </tr>
+            <tr>
+              <td>Format</td>
+              <td>9,999 lines are clean Apache combined; all timestamps <code>+0000</code>, May 2015</td>
+              <td>Confirms the combined-format parser. Timestamp is parsed but optional; nothing in v1 depends on it.</td>
+            </tr>
+            <tr>
+              <td>Truncated line</td>
+              <td>1 (line 8899): the UA field has no closing quote</td>
+              <td>A strict regex rejects it. The parser falls back to a lenient split: the IP is the first token, and the UA is everything after the last <code> "</code>. The line still counts (Googlebot / Unknown OS).</td>
+            </tr>
+            <tr>
+              <td>User-Agent <code>"-"</code></td>
+              <td>190 lines</td>
+              <td>Shows up as <code>Unknown</code> for OS and Browser. It is not a parse error.</td>
+            </tr>
+            <tr>
+              <td>Bytes <code>-</code></td>
+              <td>669 lines (mostly 304s)</td>
+              <td><code>bytes_sent: int | None</code>. The parser must accept <code>-</code>.</td>
+            </tr>
+            <tr>
+              <td>Escaped bytes in quoted fields</td>
+              <td>3 lines with <code>\xe4\xe5…</code> in the referer</td>
+              <td>The quoted-field regex is <code>"((?:[^"\\]|\\.)*)"</code>, not <code>"([^"]*)"</code>. Escapes are kept as literal text.</td>
+            </tr>
+            <tr>
+              <td>Client IPs</td>
+              <td>1,753 unique, all public IPv4. No IPv6, no private IPs. The top IP (Googlebot, 66.249.73.135) has 482 hits</td>
+              <td>A per-IP cache in front of GeoIP saves ~80% of the lookups. Private-IP → Unknown is kept for other logs and tested via the fixture.</td>
+            </tr>
+            <tr>
+              <td>Unique User-Agents</td>
+              <td>557 (the top one is Chrome 32 / Windows 7, with 1,044 hits)</td>
+              <td>A UA parse cache (<code>functools.lru_cache</code>) makes ua-parser cost negligible.</td>
+            </tr>
+            <tr>
+              <td>Bots, crawlers, feed readers</td>
+              <td>~2,100 lines (~21%): Googlebot, UniversalFeedParser (364), Tiny Tiny RSS (198), archive.org, Bing, Baidu, Yandex, Chef Client…</td>
+              <td>They are included by default because the brief counts all requests. ua-parser reports them as their own browser family (e.g. <code>Googlebot</code>), with OS <code>Other</code>, which becomes Unknown. A <code>--exclude-bots</code> <code>RecordFilter</code> is the documented extension (§9).</td>
+            </tr>
+            <tr>
+              <td>Long-tail / odd UAs</td>
+              <td>96 non-<code>Mozilla</code> UAs: J2ME phones, Opera Presto, Midori, CFNetwork, Feedfetcher…</td>
+              <td>Many labels will appear. That is why the label normalization (§4) and the optional <code>Other</code> roll-up exist.</td>
+            </tr>
+            <tr>
+              <td>Status / methods</td>
+              <td>200 ×9,125 · 304 ×445 · 404 ×213 · 301 ×164 …; GET ×9,951, HEAD 42, POST 5, OPTIONS 1</td>
+              <td>No filtering in v1: a 404 is still a request. A Status-class dimension is the worked extensibility example.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="note"><strong>GeoIP DB (resolved in 1.2.0):</strong> the first download was <code>GeoLite2-<em>ASN</em></code>, which maps IP → ISP and has no country field. <code>GeoLite2-Country_20261016.tar.gz</code> (containing <code>GeoLite2-Country.mmdb</code>, 3.4 MB) is now in the repo root, and that is the file the Country dimension uses. The ASN archives are unused and can be deleted. Because the DB is from 2026 and the log from 2015, some IPs may have been reassigned since. This is accepted as a known inaccuracy.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-input">Your comments on this section</label>
+        <textarea id="fb-input" data-key="input" placeholder="Exclude bots by default? Treat the truncated line as bad instead?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="assumptions" data-section="Assumptions and trade-offs">
+      <h2>4. Assumptions and trade-offs</h2>
+      <div class="body">
+        <table>
+          <thead><tr><th>Topic</th><th>Decision</th><th>Why / risk</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Log format</td>
+              <td>Apache combined (IP, ident, user, time, request, status, size, referer, user-agent). Strict regex first; if it fails, a lenient fallback recovers the IP and a best-effort UA, and the record is marked <code>partial=True</code>.</td>
+              <td>9,999 of 10,000 lines match the strict regex (§3). The fallback keeps the one truncated line instead of dropping it. A parser interface keeps CLF vs JSON logs swappable.</td>
+            </tr>
+            <tr>
+              <td>Denominator</td>
+              <td><strong>Changed in 1.1.0:</strong> percentages are over <em>all non-empty lines</em> (10,000 here). A line that cannot be read even leniently still counts, as <code>Unknown</code> in every dimension. The stderr summary reports <code>total / strict / partial / unreadable</code>.</td>
+              <td>The brief says “across all 10,000 requests”, and every dimension's percentages then sum to ~100% over the same base. The old “parsed only” denominator would have silently reported over 9,999.</td>
+            </tr>
+            <tr>
+              <td>Country “Other”</td>
+              <td>v1 prints every country. Optional <code>--other-below N</code> rolls remainder into <code>Other</code> to match the sample style.</td>
+              <td>The brief’s sample looks illustrative; the written requirement is “each metric, sorted by frequency”.</td>
+            </tr>
+            <tr>
+              <td>Rounding</td>
+              <td>Independent <code>round(pct, 2)</code> (banker's rounding via Python). Do not force a 100.00% sum.</td>
+              <td>Simplest, honest. A largest-remainder pass can be added if a reviewer wants an exact 100.00.</td>
+            </tr>
+            <tr>
+              <td>GeoIP misses</td>
+              <td>Private / invalid / unmapped IPs → <code>Unknown</code>. Label = <code>country.names["en"]</code>, falling back to <code>registered_country</code> (some anycast / satellite ranges only have that).</td>
+              <td>Never fail the whole run because one IP is unmapped. The DB is from 2026 and the log from 2015, so some drift is accepted.</td>
+            </tr>
+            <tr>
+              <td>UA label normalization</td>
+              <td>Take ua-parser's family, then apply a small data-driven alias table (one dict per dimension, not if-chains):
+                <ul>
+                  <li>OS: <code>Mac OS X</code> → <code>Mac OS</code>; <code>Windows 7/8/XP/Vista…</code> → <code>Windows</code>; <code>Ubuntu</code>, <code>Debian</code>, <code>Fedora</code>… → <code>Linux</code>; <code>Other</code> / empty → <code>Unknown</code>.</li>
+                  <li>Browser: <code>Other</code> / empty → <code>Unknown</code>. Real families are kept (<code>Chrome</code>, <code>Firefox</code>, <code>Mobile Safari</code>, <code>Googlebot</code>, <code>IE</code>…).</li>
+                </ul>
+              </td>
+              <td>ua-parser says <code>Other</code> where the brief says <code>Unknown</code>, and it splits Windows and Linux finer than the sample output does. Never invent <code>Edge</code> from IE. The table can be swapped (e.g. <code>--raw-families</code>) without touching the dimension code.</td>
+            </tr>
+            <tr>
+              <td>Bots &amp; feed readers</td>
+              <td>Counted like any other request (~21% of this log). The browser label is whatever ua-parser says (<code>Googlebot</code>, <code>FeedFetcher-Google</code>, …).</td>
+              <td>The brief asks for all requests. Excluding them is a filter decision, not a parsing one, so it lives in an optional <code>RecordFilter</code>, not in the dimensions.</td>
+            </tr>
+            <tr>
+              <td>DB distribution</td>
+              <td>Do not commit GeoLite2 (add <code>*.mmdb</code>, <code>GeoLite2-*</code> to <code>.gitignore</code>, which today only has Go patterns). Path via env <code>GEOIP_DB</code> or <code>--geoip</code>. Tests use a tiny fake lookup. Validate at startup that the DB's <code>database_type</code> contains <code>Country</code> or <code>City</code>, and fail fast if someone passes the ASN DB.</td>
+              <td>MaxMind license + binary size. CI must not depend on a secret DB.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="feedback">
+        <label for="fb-assumptions">Your comments on this section</label>
+        <textarea id="fb-assumptions" data-key="assumptions" placeholder="Disagree with Other / rounding / denominator?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="tech" data-section="Technology choices">
+      <h2>5. Technology choices</h2>
+      <div class="body">
+        <table>
+          <thead><tr><th>Choice</th><th>Pick</th><th>Rationale</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Language</td>
+              <td>Python ≥ 3.12 (developed and tested on 3.14)</td>
+              <td>Fast to show design (Protocols, composition), excellent UA + GeoIP libraries, cheap tests. Go would also fit the repo gitignore; Python wins the 3-hour implementation budget without hiding design.</td>
+            </tr>
+            <tr>
+              <td>Packaging</td>
+              <td><code>pyproject.toml</code> + src layout, <code>pip install -e .[dev]</code></td>
+              <td>One command to install and run; worktrees share the same contract package. (<code>uv</code> works too but is not installed on the dev machine.)</td>
+            </tr>
+            <tr>
+              <td>GeoIP</td>
+              <td><code>geoip2</code> 5.x + <strong>GeoLite2-Country.mmdb</strong> (extracted to the gitignored <code>data/</code> folder)</td>
+              <td>Required downloadable DB, not the web API.</td>
+            </tr>
+            <tr>
+              <td>User-Agent</td>
+              <td><code>ua-parser</code> 1.x (uap-core regexes via <code>ua-parser-builtins</code>)</td>
+              <td>Deterministic, widely used, maps to OS family + browser family. Alternative <code>user-agents</code> is less standard.</td>
+            </tr>
+            <tr>
+              <td>CLI</td>
+              <td><code>argparse</code> in <code>python -m weblogstats</code></td>
+              <td>No extra framework. Flags: log path, geoip path, optional other-threshold, output format.</td>
+            </tr>
+            <tr>
+              <td>Tests</td>
+              <td>pytest + ruff</td>
+              <td>Parser, each dimension, aggregator rounding/sort, golden CLI on a 20-line fixture. Developed test-first (§13).</td>
+            </tr>
+          </tbody>
+        </table>
+        <p><strong>README is the user-facing source of truth.</strong> This table explains <em>why</em>. <code>README.md</code> lists <em>what</em> a user needs and does, and it must contain:</p>
+        <ol>
+          <li><strong>Requirements:</strong> Python version (≥ 3.12), runtime deps (<code>geoip2</code>, <code>ua-parser</code>), dev deps (<code>pytest</code>, <code>ruff</code>), and the external inputs (GeoLite2-Country.mmdb from MaxMind, the Apache log file).</li>
+          <li><strong>Install:</strong> venv + <code>pip install -e .[dev]</code>, and where to put the MMDB (<code>data/</code> or <code>GEOIP_DB</code>).</li>
+          <li><strong>Usage:</strong> the <code>weblogstats</code> / <code>python -m weblogstats</code> command, every flag, sample output, and the stderr summary.</li>
+          <li><strong>Extending:</strong> step-by-step recipes for a new dimension (worked Status-class example), a new output format, a new log dialect, and a record filter. Each recipe names the file to create (one class per file) and the one line to register it.</li>
+          <li><strong>Development:</strong> run tests and lint, the project layout, and the TDD / branch / PR workflow.</li>
+        </ol>
+        <p>Wave 0 writes the Requirements, Install and Development sections. Wave 2 adds Usage and Extending once the CLI is wired. No other agent edits the README.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-tech">Your comments on this section</label>
+        <textarea id="fb-tech" data-key="tech" placeholder="Prefer Go? Different UA library?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="architecture" data-section="Architecture">
+      <h2>6. Architecture</h2>
+      <div class="body">
+        <p>A single-process pipeline. I/O, parsing, dimension extraction, aggregation, and formatting are separate so worktrees can own one box each against shared contracts.</p>
+        <div class="diagram" aria-label="Component architecture">
+          <svg viewBox="0 0 1040 590" xmlns="http://www.w3.org/2000/svg" role="img">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#0f6b63" />
+              </marker>
+            </defs>
+            <rect x="20" y="30" width="180" height="70" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="110" y="60" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">LogSource</text>
+            <text x="110" y="80" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">file / stdin lines</text>
+
+            <line x1="200" y1="65" x2="250" y2="65" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="250" y="30" width="180" height="70" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="340" y="60" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">LogParser</text>
+            <text x="340" y="80" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">Apache combined → LogRecord</text>
+
+            <line x1="430" y1="65" x2="480" y2="65" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="480" y="18" width="250" height="170" rx="12" fill="#fffdf8" stroke="#8a4b12" />
+            <text x="605" y="42" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#8a4b12">Dimension plugins</text>
+            <rect x="500" y="56" width="210" height="36" rx="8" fill="#fff6e8" stroke="#efd7b0" />
+            <text x="605" y="79" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" fill="#1c1914">CountryDimension  (GeoIP)</text>
+            <rect x="500" y="100" width="210" height="36" rx="8" fill="#fff6e8" stroke="#efd7b0" />
+            <text x="605" y="123" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" fill="#1c1914">OsDimension  (ua-parser)</text>
+            <rect x="500" y="144" width="210" height="36" rx="8" fill="#fff6e8" stroke="#efd7b0" />
+            <text x="605" y="167" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" fill="#1c1914">BrowserDimension  (ua-parser)</text>
+
+            <line x1="730" y1="100" x2="780" y2="100" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="780" y="30" width="220" height="70" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="890" y="60" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">Aggregator</text>
+            <text x="890" y="80" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">counters[dim][label] += 1</text>
+
+            <line x1="890" y1="100" x2="890" y2="150" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="780" y="155" width="220" height="70" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="890" y="185" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">ReportFormatter</text>
+            <text x="890" y="205" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">text / json / …</text>
+
+            <!-- Lookup adapters: dimensions depend on these protocols, never on MaxMind / ua-parser directly -->
+            <text x="300" y="262" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700" fill="#5c564c">Lookup adapters</text>
+            <text x="300" y="280" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">injected into dimensions,</text>
+            <text x="300" y="296" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">swapped for fakes in tests</text>
+
+            <path d="M520,188 V235" fill="none" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+            <text x="512" y="215" text-anchor="end" font-family="Consolas, monospace" font-size="11" fill="#08443f">country_name(ip)</text>
+
+            <rect x="320" y="238" width="270" height="80" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="455" y="262" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">GeoIpLookup</text>
+            <text x="455" y="282" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">MaxMindGeoIp adapter (geoip2 Reader)</text>
+            <text x="455" y="299" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">per-IP cache · private/unmapped → Unknown</text>
+
+            <line x1="455" y1="318" x2="455" y2="345" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+            <rect x="320" y="348" width="270" height="56" rx="10" fill="#fbf8f2" stroke="#8a4b12" stroke-dasharray="5 4" />
+            <text x="455" y="372" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#1c1914">GeoLite2-Country.mmdb</text>
+            <text x="455" y="391" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">--geoip / GEOIP_DB · type checked at startup</text>
+
+            <path d="M690,188 V235" fill="none" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+            <text x="682" y="215" text-anchor="end" font-family="Consolas, monospace" font-size="11" fill="#08443f">os/browser_family(ua)</text>
+
+            <rect x="620" y="238" width="270" height="80" rx="10" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="755" y="262" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#08443f">UserAgentLookup</text>
+            <text x="755" y="282" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">UaParserLookup adapter (ua-parser)</text>
+            <text x="755" y="299" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">lru_cache per UA · alias table → labels</text>
+
+            <line x1="755" y1="318" x2="755" y2="345" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+            <rect x="620" y="348" width="270" height="56" rx="10" fill="#fbf8f2" stroke="#8a4b12" stroke-dasharray="5 4" />
+            <text x="755" y="372" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#1c1914">uap-core regexes</text>
+            <text x="755" y="391" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5c564c">bundled with the ua-parser package</text>
+
+            <rect x="40" y="430" width="960" height="140" rx="12" fill="#f4efe6" stroke="#d9d0c0" />
+            <text x="60" y="458" font-family="Segoe UI, sans-serif" font-size="13" font-weight="700" fill="#5c564c">Shared contracts (Wave 0, on master)</text>
+            <text x="60" y="488" font-family="Consolas, monospace" font-size="13" fill="#1c1914">LogRecord · LogParser · Dimension · GeoIpLookup · UserAgentLookup · Aggregator · ReportFormatter · AppConfig</text>
+            <text x="60" y="518" font-family="Segoe UI, sans-serif" font-size="13" fill="#5c564c">Composition root (CLI) wires real adapters: MaxMindGeoIp, UaParserLookup, ApacheCombinedParser, TextReportFormatter.</text>
+            <text x="60" y="546" font-family="Segoe UI, sans-serif" font-size="13" fill="#5c564c">Tests inject fakes. No plugin imports MaxMind or files directly except its adapter module.</text>
+          </svg>
+        </div>
+        <p><strong>GeoIP lookup.</strong> <code>CountryDimension</code> only knows the <code>GeoIpLookup</code> protocol (<code>country_name(ip) → str</code>). The <code>MaxMindGeoIp</code> adapter is the one module that imports <code>geoip2</code>. It opens <code>GeoLite2-Country.mmdb</code> once, memory-mapped, at startup and fails fast if the file is missing or not a Country/City edition. Each lookup returns <code>country.names["en"]</code>, falls back to <code>registered_country</code>, and returns <code>Unknown</code> on <code>AddressNotFoundError</code>, a private IP or an invalid IP. A per-IP cache sits in front of it, which saves ~82% of the lookups on this log (1,753 unique IPs / 10,000 lines). <code>UserAgentLookup</code> follows the same pattern for OS and Browser.</p>
+        <p>The CLI is a thin composition root. It does not contain parsing regexes or percentage math. That keeps review conversations about <em>design</em>, not a 200-line script.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-architecture">Your comments on this section</label>
+        <textarea id="fb-architecture" data-key="architecture" placeholder="Want enrichment as a separate stage? Fewer boxes?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="flow" data-section="Main processing flow">
+      <h2>7. Main processing flow</h2>
+      <div class="body">
+        <p>One pass over the file. Dimensions never need a second read. Lookups may cache by IP / UA string because logs repeat clients.</p>
+        <div class="diagram" aria-label="Request processing sequence">
+          <svg viewBox="0 0 1040 520" xmlns="http://www.w3.org/2000/svg" role="img">
+            <defs>
+              <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#1c1914" />
+              </marker>
+            </defs>
+            <text x="80" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">CLI</text>
+            <text x="260" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Source</text>
+            <text x="440" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Parser</text>
+            <text x="640" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Dimensions</text>
+            <text x="860" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700">Aggregator / Formatter</text>
+            <line x1="80" y1="40" x2="80" y2="500" stroke="#d9d0c0" />
+            <line x1="260" y1="40" x2="260" y2="500" stroke="#d9d0c0" />
+            <line x1="440" y1="40" x2="440" y2="500" stroke="#d9d0c0" />
+            <line x1="640" y1="40" x2="640" y2="500" stroke="#d9d0c0" />
+            <line x1="860" y1="40" x2="860" y2="500" stroke="#d9d0c0" />
+
+            <line x1="80" y1="70" x2="260" y2="70" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="170" y="62" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">open(path)</text>
+
+            <line x1="260" y1="110" x2="440" y2="110" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="350" y="102" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">for each raw line</text>
+
+            <rect x="450" y="130" width="240" height="52" rx="8" fill="#fff6e8" stroke="#efd7b0" />
+            <text x="570" y="151" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">Strict fails → lenient fallback;</text>
+            <text x="570" y="168" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">unreadable → empty record (all Unknown)</text>
+
+            <line x1="440" y1="210" x2="640" y2="210" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="540" y="202" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">LogRecord</text>
+
+            <line x1="640" y1="250" x2="860" y2="250" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="750" y="242" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">observe(Country, "Ukraine")</text>
+            <line x1="640" y1="280" x2="860" y2="280" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="750" y="272" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">observe(OS, "Mac OS")</text>
+            <line x1="640" y1="310" x2="860" y2="310" stroke="#1c1914" marker-end="url(#arrow2)" />
+            <text x="750" y="302" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11">observe(Browser, "Chrome")</text>
+
+            <line x1="80" y1="370" x2="860" y2="370" stroke="#0f6b63" stroke-width="2" marker-end="url(#arrow)" />
+            <text x="480" y="362" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#08443f">EOF → snapshot() → format() → stdout</text>
+
+            <line x1="860" y1="430" x2="80" y2="430" stroke="#8a4b12" marker-end="url(#arrow2)" />
+            <text x="480" y="422" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#8a4b12">stderr: total=10000 strict=9999 partial=1 unreadable=0</text>
+
+            <text x="520" y="490" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" fill="#5c564c">Country uses GeoIpLookup(ip). OS/Browser share one UserAgentLookup(ua) per record.</text>
+          </svg>
+        </div>
+      </div>
+      <div class="feedback">
+        <label for="fb-flow">Your comments on this section</label>
+        <textarea id="fb-flow" data-key="flow" placeholder="Two-pass? Parallelize dimensions?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="abstractions" data-section="Key abstractions and interfaces">
+      <h2>8. Key abstractions and interfaces</h2>
+      <div class="body">
+        <p><strong>Rule: one class per file.</strong> Every class, whether Protocol, dataclass, adapter, test fake or test class, lives in its own module named after it in snake_case (<code>LogRecord</code> → <code>log_record.py</code>). <code>__init__.py</code> files only re-export; they define nothing. Module-level constants and helper functions may sit in the file of the one class that uses them. Wave 0 lands the contracts below in <code>src/weblogstats/contracts/</code>, one file each, so every worktree can import them immediately. They are shown together here only for reading.</p>
+<pre>
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Iterator, Protocol
+
+@dataclass(frozen=True)
+class LogRecord:
+    ip: str
+    timestamp: datetime | None
+    method: str
+    path: str
+    protocol: str
+    status: int | None
+    bytes_sent: int | None
+    referer: str
+    user_agent: str
+    raw: str
+    partial: bool = False   # True when produced by the lenient fallback
+
+class LogSource(Protocol):
+    def lines(self) -> Iterator[str]: ...
+
+class LogParser(Protocol):
+    def parse(self, line: str) -> LogRecord | None: ...
+
+class Dimension(Protocol):
+    name: str  # printed heading: "Country", "OS", "Browser"
+    def extract(self, record: LogRecord) -> str: ...
+
+class GeoIpLookup(Protocol):
+    def country_name(self, ip: str) -> str: ...  # "Unknown" if unmapped
+
+class UserAgentLookup(Protocol):
+    def os_family(self, user_agent: str) -> str: ...
+    def browser_family(self, user_agent: str) -> str: ...
+
+@dataclass(frozen=True)
+class DimensionReport:
+    name: str
+    rows: tuple[tuple[str, float], ...]  # (label, percent) desc
+
+class Aggregator(Protocol):
+    def observe(self, dimension: str, label: str) -> None: ...
+    def snapshot(self, other_below: float | None = None) -> list[DimensionReport]: ...
+
+class ReportFormatter(Protocol):
+    def format(self, reports: list[DimensionReport]) -> str: ...
+
+@dataclass
+class RunStats:             # feeds the stderr summary
+    total: int = 0
+    strict: int = 0
+    partial: int = 0
+    unreadable: int = 0
+</pre>
+        <p><strong>Module layout</strong> (one class per file; the owner is the agent from §12):</p>
+<pre>
+src/weblogstats/
+  __init__.py  __main__.py
+  cli.py                              # main(argv) composition root, no class        [Wave 2]
+  pipeline.py                         # Pipeline                                     [Wave 2]
+  contracts/                          #                                              [Wave 0]
+    log_record.py  log_source.py  log_parser.py  dimension.py
+    geo_ip_lookup.py  user_agent_lookup.py  dimension_report.py
+    aggregator.py  report_formatter.py  run_stats.py  app_config.py
+  sources/file_log_source.py          # FileLogSource                                [parser]
+  parsing/apache_combined_parser.py   # ApacheCombinedParser (strict + lenient)      [parser]
+  lookups/maxmind_geo_ip.py           # MaxMindGeoIp                                 [geoip]
+  lookups/ua_parser_lookup.py         # UaParserLookup                               [ua]
+  lookups/label_normalizer.py         # LabelNormalizer (alias tables)               [ua]
+  dimensions/country_dimension.py     # CountryDimension                             [geoip]
+  dimensions/os_dimension.py          # OsDimension                                  [ua]
+  dimensions/browser_dimension.py     # BrowserDimension                             [ua]
+  aggregation/counting_aggregator.py  # CountingAggregator                           [report]
+  formatting/text_report_formatter.py # TextReportFormatter                          [report]
+tests/
+  fakes/fake_geo_ip.py  fakes/fake_user_agent_lookup.py                              [Wave 0]
+  fixtures/sample.log                                                                [Wave 0]
+  &lt;mirrors src/: one test module per production class, e.g. tests/parsing/test_apache_combined_parser.py&gt;
+</pre>
+        <p><strong>Composition:</strong> <code>CountryDimension(geoip)</code>, <code>OsDimension(ua)</code>, <code>BrowserDimension(ua)</code>. The aggregator is dimension-agnostic: it only sees names and labels. That is the extensibility hinge.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-abstractions">Your comments on this section</label>
+        <textarea id="fb-abstractions" data-key="abstractions" placeholder="Split UA lookup? Make Dimension an ABC class with registry?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="extensibility" data-section="Extensibility">
+      <h2>9. Extensibility</h2>
+      <div class="body">
+        <p><strong>New dimension</strong> (example: Status class) — add <code>dimensions/status_dimension.py</code> containing only <code>class StatusDimension</code> with <code>name = "Status"</code> and <code>extract</code> returning <code>2xx</code>/<code>4xx</code>/… Register it in the CLI list. No aggregator or formatter change.</p>
+        <p><strong>New output format</strong> — implement <code>ReportFormatter</code>, one file per formatter (<code>formatting/json_report_formatter.py</code>, <code>formatting/csv_report_formatter.py</code>). Choose with <code>--format text|json</code>.</p>
+        <p><strong>New log dialect</strong> — implement <code>LogParser</code>. Keep <code>LogRecord</code> stable; unknown fields can be ignored.</p>
+        <p><strong>New geo source</strong> — implement <code>GeoIpLookup</code> (offline CSV, test fake). Production stays on MaxMind file.</p>
+        <p><strong>Filters later</strong> — optional <code>RecordFilter</code> protocol in front of dimensions (e.g. only GET, only 200, or <code>BotFilter</code> behind <code>--exclude-bots</code>, using ua-parser's device family <code>Spider</code> plus a small regex for feed readers). Not built in v1. Filtered records leave the denominator, and the stderr summary says how many.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-extensibility">Your comments on this section</label>
+        <textarea id="fb-extensibility" data-key="extensibility" placeholder="Need a plugin entry-point / setuptools registry?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="output" data-section="Output contract">
+      <h2>10. Output contract</h2>
+      <div class="body">
+        <p>Stdout matches the assignment sample shape. Headings have a trailing colon. One blank line between metric blocks. Labels and percentages separated by a single space. Percentages always two decimals and a <code>%</code> sign.</p>
+<pre>
+Country:
+United States 35.10%
+United Kingdom 27.55%
+
+OS:
+Windows 64.36%
+
+Browser:
+Chrome 35.45%
+</pre>
+        <p>Sort: count descending, then label ascending for ties. Labels are the display strings from extractors after alias maps.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-output">Your comments on this section</label>
+        <textarea id="fb-output" data-key="output" placeholder="JSON default? Stable ordering rules?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="errors" data-section="Errors, Unknown, Other">
+      <h2>11. Errors, Unknown, Other</h2>
+      <div class="body">
+        <ul>
+          <li><strong>Missing log file / missing MMDB:</strong> non-zero exit, clear message. Do not start a partial report.</li>
+          <li><strong>Malformed line:</strong> never dropped and never fatal. Strict regex → lenient fallback (<code>partial=True</code>) → if even the IP cannot be read, the pipeline uses an empty <code>LogRecord</code>, so every dimension yields <code>Unknown</code>. The line stays in the denominator. stderr on this log: <code>total=10000 strict=9999 partial=1 unreadable=0</code>.</li>
+          <li><strong>UA <code>"-"</code>, bytes <code>-</code>, <code>\x</code> escapes:</strong> valid input, not errors (§3).</li>
+          <li><strong>Wrong GeoIP DB type</strong> (e.g. ASN): fail at startup with a message naming the expected Country/City edition.</li>
+          <li><strong>Unknown:</strong> extractor return value when IP or UA cannot be classified. Always a first-class bucket.</li>
+          <li><strong>Other:</strong> only if <code>--other-below</code> is set (percent threshold). Applied per dimension after percentages are computed, then Other is appended last (or sorted if it is large — v1: Other always last to match the sample).</li>
+        </ul>
+      </div>
+      <div class="feedback">
+        <label for="fb-errors">Your comments on this section</label>
+        <textarea id="fb-errors" data-key="errors" placeholder="Fail-fast on bad lines instead?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="worktrees" data-section="Subagent plan">
+      <h2>12. Subagent plan: worktrees, branches, PRs</h2>
+      <div class="body">
+        <p>Implementation is done by Claude subagents (model <strong>Sonnet</strong>, effort <strong>high</strong>), each in its own git worktree on its own <code>dev/*</code> branch. Every agent works test-first, runs the full suite and lint before it hands back, and finishes by pushing its branch and presenting a PR into <code>master</code>. Nobody merges their own PR: the human reviews and merges. Wave 0 is a short serial bootstrap that publishes contracts and a green empty CLI. Once it is merged, the four Wave 1 branches only add files under their owned paths, so they merge independently.</p>
+        <p>Each agent's full brief is a file in <code>docs/agents/</code> on <code>master</code>. The shared rules (TDD loop, one class per file, branch/PR protocol, data paths) are in <code>docs/agents/00-common.md</code>, and every brief starts by reading it.</p>
+        <div class="diagram" aria-label="Agent waves">
+          <svg viewBox="0 0 1040 430" xmlns="http://www.w3.org/2000/svg" role="img">
+            <rect x="20" y="20" width="1000" height="90" rx="12" fill="#e8f3f1" stroke="#0f6b63" />
+            <text x="40" y="48" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#08443f">Wave 0 — bootstrap (1 agent, blocking) · dev/bootstrap</text>
+            <text x="40" y="74" font-family="Segoe UI, sans-serif" font-size="13" fill="#1c1914">pyproject · src layout · contracts/ (one class per file) · test fakes · stub CLI · smoke tests · fixture · README requirements</text>
+            <text x="40" y="96" font-family="Segoe UI, sans-serif" font-size="13" fill="#5c564c">PR → human merges into master. This is the only gate before parallel work.</text>
+
+            <rect x="20" y="130" width="230" height="150" rx="12" fill="#fffdf8" stroke="#d9d0c0" />
+            <text x="135" y="158" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700">Agent: parser</text>
+            <text x="32" y="186" font-family="Segoe UI, sans-serif" font-size="12">branch: dev/parser</text>
+            <text x="32" y="208" font-family="Segoe UI, sans-serif" font-size="12">file_log_source.py</text>
+            <text x="32" y="230" font-family="Segoe UI, sans-serif" font-size="12">apache_combined_parser.py</text>
+            <text x="32" y="260" font-family="Segoe UI, sans-serif" font-size="12" fill="#0f6b63">no GeoIP / UA deps</text>
+
+            <rect x="270" y="130" width="230" height="150" rx="12" fill="#fffdf8" stroke="#d9d0c0" />
+            <text x="385" y="158" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700">Agent: geoip</text>
+            <text x="282" y="186" font-family="Segoe UI, sans-serif" font-size="12">branch: dev/geoip</text>
+            <text x="282" y="208" font-family="Segoe UI, sans-serif" font-size="12">maxmind_geo_ip.py</text>
+            <text x="282" y="230" font-family="Segoe UI, sans-serif" font-size="12">country_dimension.py</text>
+            <text x="282" y="260" font-family="Segoe UI, sans-serif" font-size="12" fill="#0f6b63">owns MaxMind adapter</text>
+
+            <rect x="520" y="130" width="230" height="150" rx="12" fill="#fffdf8" stroke="#d9d0c0" />
+            <text x="635" y="158" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700">Agent: ua</text>
+            <text x="532" y="186" font-family="Segoe UI, sans-serif" font-size="12">branch: dev/user-agent</text>
+            <text x="532" y="208" font-family="Segoe UI, sans-serif" font-size="12">ua_parser_lookup · label_normalizer</text>
+            <text x="532" y="230" font-family="Segoe UI, sans-serif" font-size="12">os_dimension · browser_dimension</text>
+            <text x="532" y="260" font-family="Segoe UI, sans-serif" font-size="12" fill="#0f6b63">alias tables + UA cache</text>
+
+            <rect x="770" y="130" width="250" height="150" rx="12" fill="#fffdf8" stroke="#d9d0c0" />
+            <text x="895" y="158" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700">Agent: report</text>
+            <text x="782" y="186" font-family="Segoe UI, sans-serif" font-size="12">branch: dev/report</text>
+            <text x="782" y="208" font-family="Segoe UI, sans-serif" font-size="12">counting_aggregator.py</text>
+            <text x="782" y="230" font-family="Segoe UI, sans-serif" font-size="12">text_report_formatter.py</text>
+            <text x="782" y="260" font-family="Segoe UI, sans-serif" font-size="12" fill="#0f6b63">sort / % / Other</text>
+
+            <rect x="20" y="300" width="1000" height="110" rx="12" fill="#fff6e8" stroke="#efd7b0" />
+            <text x="40" y="328" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#8a4b12">Wave 2 — compose (1 agent, after all Wave 1 PRs merge) · dev/compose</text>
+            <text x="40" y="356" font-family="Segoe UI, sans-serif" font-size="13">Pipeline + CLI wiring: source → parser → [dimensions] → aggregator → formatter. Golden test on the fixture, full 10k run, README usage + extending.</text>
+            <text x="40" y="384" font-family="Segoe UI, sans-serif" font-size="13">The integration agent must not rewrite plugin internals: composition and docs only. It reports bugs in plugins instead of fixing them.</text>
+          </svg>
+        </div>
+
+        <h3>Agents, branches, briefs</h3>
+        <table>
+          <thead><tr><th>Agent</th><th>Branch</th><th>Brief</th><th>Owns</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>bootstrap (Wave 0)</td>
+              <td><code>dev/bootstrap</code></td>
+              <td><code>docs/agents/01-bootstrap.md</code></td>
+              <td><code>pyproject.toml</code>, <code>contracts/</code>, package skeleton, <code>tests/fakes/</code>, <code>tests/fixtures/</code>, stub CLI, README (Requirements / Install / Development)</td>
+              <td><code>pip install -e .[dev]</code> works; contract + fake + fixture tests pass; <code>weblogstats --help</code> runs; ruff clean.</td>
+            </tr>
+            <tr>
+              <td>parser</td>
+              <td><code>dev/parser</code></td>
+              <td><code>docs/agents/02-parser.md</code></td>
+              <td><code>sources/file_log_source.py</code>, <code>parsing/apache_combined_parser.py</code> + tests</td>
+              <td>Every fixture line yields a record; truncated line → <code>partial=True</code> with the IP and UA recovered; garbage → None; <code>-</code> bytes → None; escaped referer parses; brief sample line fields correct; the full 10k log gives strict=9999, partial=1.</td>
+            </tr>
+            <tr>
+              <td>geoip</td>
+              <td><code>dev/geoip</code></td>
+              <td><code>docs/agents/03-geoip.md</code></td>
+              <td><code>lookups/maxmind_geo_ip.py</code>, <code>dimensions/country_dimension.py</code> + tests</td>
+              <td>Fake lookup tests pass; adapter opens the real MMDB and rejects a non-Country DB; Unknown for private, invalid and empty IPs; registered_country fallback; per-IP cache.</td>
+            </tr>
+            <tr>
+              <td>ua</td>
+              <td><code>dev/user-agent</code></td>
+              <td><code>docs/agents/04-user-agent.md</code></td>
+              <td><code>lookups/ua_parser_lookup.py</code>, <code>lookups/label_normalizer.py</code>, <code>dimensions/os_dimension.py</code>, <code>dimensions/browser_dimension.py</code> + tests</td>
+              <td>Chrome/Mac OS from the brief sample UA; <code>-</code>/empty/<code>Other</code> → Unknown; aliases Mac OS X → Mac OS, Windows 7 → Windows, Ubuntu → Linux; Googlebot keeps its family.</td>
+            </tr>
+            <tr>
+              <td>report</td>
+              <td><code>dev/report</code></td>
+              <td><code>docs/agents/05-report.md</code></td>
+              <td><code>aggregation/counting_aggregator.py</code>, <code>formatting/text_report_formatter.py</code> + tests</td>
+              <td>Known counts produce exact two-decimal sorted text; tie order by label; optional Other threshold, with Other last.</td>
+            </tr>
+            <tr>
+              <td>compose (Wave 2)</td>
+              <td><code>dev/compose</code></td>
+              <td><code>docs/agents/06-compose.md</code></td>
+              <td><code>pipeline.py</code>, <code>cli.py</code>, golden tests, README (Usage / Extending)</td>
+              <td>Golden fixture output matches; the 10k run prints three blocks over a denominator of 10000 and the stderr summary; README recipes followed literally produce a working Status dimension in a scratch test.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Order</h3>
+        <ol>
+          <li>The human commits and pushes the HLD + briefs to <code>master</code>.</li>
+          <li>Spawn <strong>bootstrap</strong>. Review its PR and merge it into <code>master</code>.</li>
+          <li>Spawn <strong>parser, geoip, ua, report</strong> in parallel. Each branches from the updated <code>master</code>. Review and merge the 4 PRs in any order (the files are disjoint).</li>
+          <li>Spawn <strong>compose</strong>. Review and merge its PR.</li>
+        </ol>
+        <p class="note">Rules for every agent: implement only owned paths; import contracts, never another Wave 1 agent's module; never edit contracts (propose the change in the PR description instead); write the failing test first; the PR is presented only after the full suite and ruff pass, and it includes their output.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-worktrees">Your comments on this section</label>
+        <textarea id="fb-worktrees" data-key="worktrees" placeholder="More agents? Combine UA+report? Different merge order?"></textarea>
+      </div>
+    </section>
+
+    <section class="block" id="testing" data-section="Testing and verification">
+      <h2>13. Testing and verification</h2>
+      <div class="body">
+        <p><strong>TDD is mandatory.</strong> For every behaviour: write the test, run it, and see it fail for the right reason (red). Write the minimum code to pass (green), refactor, then commit. Tests sit next to production code in the same commit series. No production class is merged without a test module that exercises it. Before a PR is presented, the agent runs <code>python -m pytest -q</code> (full suite, not just its own tests) and <code>ruff check .</code>, and pastes both outputs into the PR description.</p>
+        <ul>
+          <li><strong>Unit:</strong> parser, each dimension with fakes, aggregator sort/percent/Other. One test module per production class.</li>
+          <li><strong>Contract:</strong> fakes in <code>tests/fakes/</code> satisfy the Protocols (checked with <code>isinstance</code> on <code>runtime_checkable</code> protocols) so Wave 1 tests and Wave 2 wiring agree.</li>
+          <li><strong>Integration (marked <code>@pytest.mark.data</code>):</strong> tests that need <code>data/GeoLite2-Country.mmdb</code> or the 10k log are skipped when the file is absent, so CI and fresh clones stay green.</li>
+          <li><strong>Golden:</strong> fixture → exact stdout (Wave 2). Assert that every dimension sums to the same total (= number of non-empty lines).</li>
+          <li><strong>Manual:</strong> full 10k file once GeoLite2-Country is on disk. Expect denominator 10000, Unknown OS/Browser ≥ 1.9% (the 190 <code>"-"</code> UAs plus bots), and Windows / Chrome / United States near the top. The brief sample numbers are illustrative and will not match.</li>
+          <li><strong>Browser / UI:</strong> this HLD page itself — comments persist in localStorage; copy/clear buttons.</li>
+        </ul>
+        <p>If a reviewer asks “how do you add a dimension?”, the answer is: write the test, add <code>dimensions/status_dimension.py</code> implementing <code>Dimension</code>, register it in the CLI list. The README has the recipe. That sentence is the design’s success criterion.</p>
+      </div>
+      <div class="feedback">
+        <label for="fb-testing">Your comments on this section</label>
+        <textarea id="fb-testing" data-key="testing" placeholder="Want property tests? Snapshot the 10k output?"></textarea>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <footer class="actions">
+    <button class="primary" type="button" id="copy-comments">Copy all comments</button>
+    <button class="ghost" type="button" id="clear-comments">Clear all comments</button>
+  </footer>
+
+  <script>
+    const VERSION = "1.3.0";
+    const STORAGE_KEY = "adaptive6-hld-comments-" + VERSION;
+    const boxes = [...document.querySelectorAll("textarea[data-key]")];
+
+    function load() {
+      try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        boxes.forEach((el) => { if (data[el.dataset.key]) el.value = data[el.dataset.key]; });
+      } catch {}
+    }
+    function save() {
+      const data = {};
+      boxes.forEach((el) => { data[el.dataset.key] = el.value; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+    boxes.forEach((el) => el.addEventListener("input", save));
+    load();
+
+    function collect() {
+      const chunks = [];
+      document.querySelectorAll("section.block").forEach((sec) => {
+        const title = sec.dataset.section;
+        const ta = sec.querySelector("textarea");
+        const text = (ta?.value || "").trim();
+        if (text) chunks.push("## " + title + "\n" + text);
+      });
+      if (!chunks.length) return "";
+      return "HLD v" + VERSION + " feedback\n\n" + chunks.join("\n\n");
+    }
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 1800);
+    }
+
+    document.getElementById("copy-comments").addEventListener("click", async () => {
+      const text = collect();
+      if (!text) { toast("No comments to copy"); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast("Comments copied — paste them in chat");
+      } catch {
+        window.prompt("Copy comments:", text);
+      }
+    });
+
+    document.getElementById("clear-comments").addEventListener("click", () => {
+      if (!confirm("Clear all comments on this page?")) return;
+      boxes.forEach((el) => { el.value = ""; });
+      localStorage.removeItem(STORAGE_KEY);
+      toast("Comments cleared");
+    });
+  </script>
+</body>
+</html>

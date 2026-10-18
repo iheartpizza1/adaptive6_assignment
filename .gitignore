@@ -44,3 +44,13 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Generated GeoIP import files
+/db/generated/
+
+# Local input data (not redistributable / fetched separately)
+data/
+*.mmdb
+GeoLite2-*
+apache_log.txt
+Assignment_instructions.md
