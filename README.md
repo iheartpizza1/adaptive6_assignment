@@ -45,7 +45,7 @@ Installing the package does not add `weblogstats` to your PATH. Use one of the t
 **Option A: no activation (recommended).** Call the executable in the venv directly:
 
 ```powershell
-.\.venv\Scripts\weblogstats.exe apache_log.txt --geoip data\GeoLite2-Country.mmdb
+.\.venv\Scripts\weblogstats.exe apache_log.txt --geoip data\GeoLite2-Country.mmdb --other-below 2
 ```
 
 **Option B: activate the venv for this PowerShell window.** Then `weblogstats` works by its short
@@ -53,7 +53,7 @@ name, and the prompt shows `(.venv)`:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb
+weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb --other-below 2
 deactivate
 ```
 
@@ -68,7 +68,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 You can also run it as a module, with no activation and no executable:
 
 ```powershell
-.\.venv\Scripts\python.exe -m weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb
+.\.venv\Scripts\python.exe -m weblogstats apache_log.txt --geoip data\GeoLite2-Country.mmdb --other-below 2
 ```
 
 For this assignment, the full command that writes the report to a file is:
@@ -87,7 +87,7 @@ apart. Both streams are written as UTF-8.
 | `log` (positional) | required | Path to an Apache combined-format log file. |
 | `--geoip PATH` | `$GEOIP_DB`, else `data/GeoLite2-Country.mmdb` | The MaxMind GeoLite2 **Country** (or City) MMDB. |
 | `--format {text}` | `text` | Output format. Only `text` exists today; see [Extending](#extending). |
-| `--other-below FLOAT` | off | Roll every row below this percentage into one `Other` row at the end of its block. |
+| `--other-below FLOAT` | off | Roll every row below this percentage into one `Other` row at the end of its block, reducing output lines for small dimention counts. |
 | `--errors-file PATH` | `$WEBLOGSTATS_ERRORS_FILE`, else `[output] errors_file` in the config file, else `weblogstats-errors.log` | Where partial and unreadable lines are logged. See [The errors file](#the-errors-file). |
 | `--config PATH` | `$WEBLOGSTATS_CONFIG`, else `config/weblogstats.toml` if it exists | TOML settings file: lookup cache sizes and the errors file. See [The config file](#the-config-file). |
 | `-h`, `--help` | | Show the usage and exit. |
